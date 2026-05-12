@@ -7,6 +7,7 @@
 
 pub mod git_dispatch;
 pub mod locks;
+pub mod periodic_fetch;
 pub mod pools;
 pub mod rate_limit;
 pub mod watcher_registry;

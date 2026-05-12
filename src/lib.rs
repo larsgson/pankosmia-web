@@ -265,12 +265,23 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
 
     // Phase 2 storage abstraction. Endpoints call this trait object
     // instead of `std::fs::*` directly. The runtime selector picks
-    // the implementation from
-    // `STORAGE_BACKEND=fs|github|supabase`.
+    // the implementation from `STORAGE_BACKEND=fs|github`.
     let project_store = crate::store::selector::build_project_store(
         std::path::PathBuf::from(repo_dir_path.clone()),
         Some(catalog.clone()),
     );
+    // Periodic-fetch fallback for missed language webhooks. Spawned
+    // before `manage` consumes the store so we can hold our own
+    // Arc clone. No-op cadence in FS mode (empty catalog).
+    if let Some(interval) = crate::server::periodic_fetch::interval_from_env() {
+        crate::server::periodic_fetch::spawn(
+            catalog.clone(),
+            project_store.clone(),
+            interval,
+        );
+    } else {
+        println!("periodic_fetch: disabled (PANKOSMIA_PERIODIC_FETCH_INTERVAL_SECS=0)");
+    }
     my_rocket = my_rocket.manage(project_store);
 
     // M4 — scaling primitives. Per-language locks for git

@@ -291,12 +291,47 @@ What triggers a `change` event in **GitHub mode**:
 
 | Trigger | What happens |
 |---|---|
-| Language admin merges a PR | GitHub webhook → server fetches upstream → file mtimes change → SSE `change` |
-| Direct push to the language repo (admin bypassed the app) | Webhook → fetch → SSE `change` |
+| Language admin merges a PR | Webhook (or periodic fetch fallback) → server fetches upstream → file mtimes change → SSE `change` |
+| Direct push to the language repo (admin bypassed the app) | Same as above |
 | Translator saves their own edit | NOT a `change` event — their edit isn't on upstream's tracked branch yet |
 
 A translator's own save doesn't fire their own SSE. They see their
 edit via optimistic UI; the SSE fires later when the admin merges.
+
+### Propagation latency
+
+Cross-user merge propagation is **not sub-second**. The server's
+local cache of the upstream language repo is refreshed by one of
+two paths:
+
+- **Repo webhook** (push / pull_request → `POST /webhook/language/<code>`).
+  When configured on the language repo, this fires within seconds
+  of a merge, the server runs `git fetch`, and SSE `change` events
+  reach subscribers shortly after.
+- **Periodic fetch** (~15-minute fallback). Always on. Catches
+  missed webhook deliveries and GitHub-side webhook outages.
+  Configurable via the
+  `PANKOSMIA_PERIODIC_FETCH_INTERVAL_SECS` env var on the server
+  (default 900; set `0` to disable).
+
+The operator chooses whether to register the per-repo webhook on
+top of the always-on periodic path. **Deployments without the
+webhook run on the periodic-fetch cadence only**, which means SSE
+`change` events for cross-user merges can lag by up to one
+interval (~15 min by default).
+
+UI guidance for clients:
+
+- Don't word "this passage was just updated by someone else"
+  affordances as if propagation were realtime. **"Recent update
+  available — refresh?"** is honest at both webhook and periodic
+  cadences; "Just updated" is misleading on poll-only deployments.
+- The translator's own optimistic-UI updates are still
+  instantaneous (rendered client-side immediately on save). The
+  latency applies only to seeing *other people's* merged edits.
+- Periodic `EventSource` reconnects (e.g. on tab focus) are fine
+  and cheap — the server only emits a `change` when content hash
+  actually changed.
 
 ---
 

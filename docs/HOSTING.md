@@ -349,9 +349,18 @@ code is in the path):
 - **Events**: `push` and `pull_request`
 
 The catalog admin sets up the catalog webhook; each language admin
-sets up their own. Without webhooks, the server falls back to a
-periodic 15-minute fetch — slower propagation but the system stays
-functional.
+sets up their own. Without webhooks, the server falls back to its
+periodic fetch — always-on, default cadence 15 min, configurable
+via `PANKOSMIA_PERIODIC_FETCH_INTERVAL_SECS` (set `0` to disable).
+Slower propagation than webhooks but the system stays functional.
+
+**Tell client developers** which cadence applies to your
+deployment. Clients render the same SSE-driven "content updated"
+affordance either way, but the wording differs: with webhooks,
+"someone just updated this passage" reads true; without them,
+"recent update available — refresh?" matches reality. The
+`docs/CLIENT_INTEGRATION.md` §7 "Propagation latency" section
+gives the client-side guidance.
 
 ---
 
