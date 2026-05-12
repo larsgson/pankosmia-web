@@ -11,7 +11,7 @@
 #   /data                            ← workspace dir; volume-mounted in production
 
 # --- Build stage --------------------------------------------------
-FROM rust:1.86-slim-bookworm AS build
+FROM rust:1.90-slim-bookworm AS build
 WORKDIR /build
 
 RUN apt-get update \
@@ -23,15 +23,16 @@ RUN apt-get update \
        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Fetch deps first so most code changes don't bust the layer.
+# Fetch deps separately so the registry layer caches across most
+# code changes. Compile happens in the next layer with the real
+# sources — the stub-source dep-cache trick is too fragile with
+# Cargo's fingerprint tracking when the crate has both [[bin]] and
+# [lib] targets.
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src \
-    && echo "fn main() {}" > src/main.rs \
-    && cargo build --release --locked \
-    && rm -rf src target/release/deps/pankosmia_docker* target/release/pankosmia_docker
+RUN cargo fetch --locked
 
 COPY src ./src
-RUN cargo build --release --locked
+RUN cargo build --release --locked --offline
 
 # --- Runtime stage ------------------------------------------------
 FROM debian:bookworm-slim
