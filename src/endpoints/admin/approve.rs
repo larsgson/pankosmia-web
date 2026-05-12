@@ -19,7 +19,7 @@ const ALLOWED_METHODS: &[&str] = &["squash", "merge", "rebase"];
 pub async fn approve_pr(
     cookies: &CookieJar<'_>,
     catalog: &State<Arc<CatalogRegistry>>,
-    app_auth: Option<&State<GithubAppAuth>>,
+    app_auth: &State<Option<GithubAppAuth>>,
     tokens: &State<TokenStore>,
     github_client: &State<GithubClient>,
     language: String,

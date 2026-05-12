@@ -306,22 +306,25 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     let _ = github_client; // managed above; no longer baked into edit_flow
 
     // GitHub App auth (foundation for the App-model edit flow).
-    // Tries to load `GITHUB_APP_ID` + a private key (file path or
-    // inline PEM). Absent / mis-configured: warn and continue; this
-    // module is only consumed by the App-model save path, which
-    // doesn't ship in Stage 1.
-    match crate::auth::GithubAppAuth::from_env() {
-        Ok(Some(app_auth)) => {
-            println!("GitHub App auth configured (App ID present)");
-            my_rocket = my_rocket.manage(app_auth);
-        }
-        Ok(None) => {
-            println!("GitHub App auth not configured (GITHUB_APP_ID unset)");
-        }
-        Err(e) => {
-            eprintln!("WARN: GitHub App auth misconfigured: {}", e);
-        }
-    }
+    // Always managed as `Option<GithubAppAuth>` so Rocket's sentinel
+    // system can verify the state type at boot — endpoints take
+    // `&State<Option<GithubAppAuth>>` and branch on the inner option.
+    let app_auth_option: Option<crate::auth::GithubAppAuth> =
+        match crate::auth::GithubAppAuth::from_env() {
+            Ok(Some(app_auth)) => {
+                println!("GitHub App auth configured (App ID present)");
+                Some(app_auth)
+            }
+            Ok(None) => {
+                println!("GitHub App auth not configured (GITHUB_APP_ID unset)");
+                None
+            }
+            Err(e) => {
+                eprintln!("WARN: GitHub App auth misconfigured: {}", e);
+                None
+            }
+        };
+    my_rocket = my_rocket.manage(app_auth_option);
 
     // Webhook secret for GitHub webhooks (G2). Empty when not
     // configured; webhook endpoints fail with 503 in that case.

@@ -69,7 +69,7 @@ pub fn not_implemented_github(op: &str) -> status::Custom<(ContentType, String)>
 pub async fn handle_github_op<'a>(
     cookies: &CookieJar<'_>,
     edit_flow: &State<GithubEditFlow>,
-    app_auth: Option<&State<GithubAppAuth>>,
+    app_auth: &State<Option<GithubAppAuth>>,
     tokens: &State<TokenStore>,
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,
@@ -125,8 +125,8 @@ pub async fn handle_github_op<'a>(
             );
         }
     };
-    let app_auth = match app_auth {
-        Some(a) => a.inner(),
+    let app_auth = match app_auth.inner().as_ref() {
+        Some(a) => a,
         None => {
             return not_ok_json_response(
                 Status::ServiceUnavailable,

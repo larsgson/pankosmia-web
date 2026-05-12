@@ -29,7 +29,7 @@ pub async fn copy_ingredient(
     store: &State<SharedProjectStore>,
     cookies: &CookieJar<'_>,
     edit_flow: &State<GithubEditFlow>,
-    app_auth: Option<&State<GithubAppAuth>>,
+    app_auth: &State<Option<GithubAppAuth>>,
     tokens: &State<TokenStore>,
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,

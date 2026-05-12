@@ -44,7 +44,7 @@ pub async fn post_raw_ingredient(
     state: &State<AppSettings>,
     cookies: &CookieJar<'_>,
     edit_flow: &State<GithubEditFlow>,
-    app_auth: Option<&State<GithubAppAuth>>,
+    app_auth: &State<Option<GithubAppAuth>>,
     tokens: &State<TokenStore>,
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,

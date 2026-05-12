@@ -64,6 +64,7 @@ USER pankosmia
 EXPOSE 19119
 
 ENV ROCKET_ADDRESS=0.0.0.0 \
+    ROCKET_PORT=19119 \
     APP_RESOURCES_DIR=/app/app_resources/ \
     PANKOSMIA_CATALOG_PATH=/app/catalog/languages.yaml
 

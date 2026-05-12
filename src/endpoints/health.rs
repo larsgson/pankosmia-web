@@ -23,7 +23,7 @@ use std::sync::Arc;
 #[get("/health")]
 pub fn get_health(
     catalog: &State<Arc<CatalogRegistry>>,
-    app_auth: Option<&State<GithubAppAuth>>,
+    app_auth: &State<Option<GithubAppAuth>>,
 ) -> status::Custom<(ContentType, String)> {
     let backend = std::env::var("STORAGE_BACKEND").unwrap_or_else(|_| "fs".into());
     let mut reasons: Vec<&'static str> = Vec::new();
@@ -33,7 +33,7 @@ pub fn get_health(
     if needs_catalog && catalog_languages == 0 {
         reasons.push("catalog has no registered languages");
     }
-    let app_auth_configured = app_auth.is_some();
+    let app_auth_configured = app_auth.inner().is_some();
     if needs_catalog && !app_auth_configured {
         reasons.push("GitHub App auth not configured");
     }

@@ -32,7 +32,7 @@ pub struct AdminContext {
 pub async fn resolve(
     cookies: &CookieJar<'_>,
     catalog: &State<Arc<CatalogRegistry>>,
-    app_auth: Option<&State<GithubAppAuth>>,
+    app_auth: &State<Option<GithubAppAuth>>,
     tokens: &State<TokenStore>,
     github_client: &State<GithubClient>,
     language_code: &str,
@@ -43,7 +43,7 @@ pub async fn resolve(
             make_bad_json_data_response("not signed in".into()),
         )
     })?;
-    let app_auth = app_auth.ok_or_else(|| {
+    let app_auth = app_auth.inner().as_ref().ok_or_else(|| {
         not_ok_json_response(
             Status::ServiceUnavailable,
             make_bad_json_data_response(

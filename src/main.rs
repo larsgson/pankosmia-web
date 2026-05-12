@@ -5,12 +5,11 @@ use rocket::fs::relative;
 #[rocket::main]
 pub async fn main() -> Result<(), rocket::Error> {
     // Bridge PaaS-style `PORT` injection (Railway, Fly.io, Heroku-
-    // family) to Rocket's expected `ROCKET_PORT`. Only does anything
-    // when `ROCKET_PORT` is not already set — explicit config wins.
-    if env::var("ROCKET_PORT").is_err() {
-        if let Ok(port) = env::var("PORT") {
-            env::set_var("ROCKET_PORT", port);
-        }
+    // family) to Rocket's expected `ROCKET_PORT`. When `PORT` is set
+    // it always wins — that's the convention. Without `PORT` the
+    // server falls back to `ROCKET_PORT` (or Rocket's default).
+    if let Ok(port) = env::var("PORT") {
+        env::set_var("ROCKET_PORT", port);
     }
 
     let args: Vec<String> = env::args().collect();

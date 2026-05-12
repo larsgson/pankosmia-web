@@ -16,7 +16,7 @@ use std::sync::Arc;
 pub async fn list_pr_files(
     cookies: &CookieJar<'_>,
     catalog: &State<Arc<CatalogRegistry>>,
-    app_auth: Option<&State<GithubAppAuth>>,
+    app_auth: &State<Option<GithubAppAuth>>,
     tokens: &State<TokenStore>,
     github_client: &State<GithubClient>,
     language: String,

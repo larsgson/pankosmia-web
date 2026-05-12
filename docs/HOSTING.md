@@ -217,6 +217,114 @@ Use Workers / Enterprise for longer idles.
 
 ---
 
+## 5b. Railway via GHCR (turnkey hosted setup)
+
+CI builds the image on push to `main` and tags, and publishes to
+`ghcr.io/<owner>/pankosmia-docker`. Railway pulls from there. Build
+work happens on GitHub Actions; Railway just runs the image.
+
+### Image tags
+
+The `.github/workflows/ci.yml` job emits these tags on each push
+to `main`:
+
+| Tag | Use |
+|---|---|
+| `:latest` | rolling pointer; Railway pulls this for "always head" |
+| `:main` | branch pointer (alias of `:latest` while only `main` ships) |
+| `:sha-abc1234` | immutable per-commit; pin for predictable rollbacks |
+
+On `git tag v1.2.3` push, additional tags land: `:1.2.3`, `:1.2`.
+
+### Railway service config
+
+Source: **Deploy from container image** → `ghcr.io/<owner>/pankosmia-docker:latest`.
+
+Volume: mount **at `/data`**, size 1–5 GB (grows with cached language
+clones). The image creates `/data` chowned to UID 1000 at build
+time; Railway's volume keeps its own ownership and the runtime
+process runs as `pankosmia` (UID 1000) — they line up.
+
+Healthcheck path: `/health`. The endpoint returns 200 when the
+catalog is loaded AND App auth is configured (see §11 below).
+Railway will mark the deploy unhealthy on 503 until env vars are
+right.
+
+### Required env vars (Railway → Variables)
+
+```
+STORAGE_BACKEND=github
+PANKOSMIA_PUBLIC_ORIGIN=https://<your-service>.up.railway.app
+GITHUB_WEBHOOK_SECRET=<long random string; same value used to register repo webhooks>
+
+# GitHub App — identity (App's OAuth credentials section)
+GITHUB_CLIENT_ID=Iv23li...
+GITHUB_CLIENT_SECRET=<from the App's settings>
+
+# GitHub App — app-level credentials (installation tokens)
+GITHUB_APP_ID=<numeric>
+PANKOSMIA_DEFAULT_INSTALLATION_ID=<numeric>
+GITHUB_APP_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----
+<paste the full PEM body lines>
+-----END RSA PRIVATE KEY-----
+
+# Server-held secrets — generate ONCE for prod, never change
+PANKOSMIA_TOKEN_ENCRYPTION_KEY=<openssl rand -base64 32>
+ROCKET_SECRET_KEY=<openssl rand -base64 32>
+```
+
+Notes:
+
+- **Don't set `ROCKET_PORT`.** The image bridges Railway's injected
+  `PORT` automatically (`main.rs` copies `PORT` → `ROCKET_PORT`
+  before Rocket reads it).
+- **`GITHUB_APP_PRIVATE_KEY` as env-as-content.** Railway preserves
+  newlines in env values; paste the entire PEM including the
+  BEGIN/END lines. The file-path variant (`GITHUB_APP_PRIVATE_KEY_PATH`)
+  is for local dev with `chmod 600`'d files; on Railway, env-content
+  is the right pattern.
+- **Don't reuse dev secrets.** Generate fresh
+  `PANKOSMIA_TOKEN_ENCRYPTION_KEY` and `ROCKET_SECRET_KEY` for
+  production; once set, never change them — that invalidates stored
+  OAuth tokens and active sessions.
+
+### Catalog file
+
+Baked into the image at `/app/catalog/languages.yaml`. To add a
+language: PR against `catalog/languages.yaml` in the repo; CI
+rebuilds the image; Railway redeploys (auto on `:latest`, or
+pin-and-bump if using a sha tag).
+
+For deployments that want catalog updates without redeploys: mount
+a volume at `/data/catalog/`, set
+`PANKOSMIA_CATALOG_PATH=/data/catalog/languages.yaml`, and maintain
+the file out-of-band (git pull on the volume, etc.). Not the
+default; documented for completeness.
+
+### After the first deploy
+
+Update the GitHub App's **Callback URL** to
+`https://<your-service>.up.railway.app/auth/callback`. (Multiple
+callback URLs are allowed — keep the local-dev one too.)
+
+For each language repo (and the catalog repo when one exists), add
+the webhook per §6 with the Railway domain.
+
+### Rollback
+
+`:sha-abc1234` tags are immutable. To roll back, change the
+Railway source to the previous SHA tag and redeploy. State on the
+mounted volume is preserved.
+
+### GitHub Container Registry authentication
+
+The image is **public** by default (matches the repo visibility).
+No Railway-side auth needed. If you flip the package private later,
+Railway needs a personal access token with `read:packages`,
+configured under the service's image-pull credentials.
+
+---
+
 ## 6. Webhook setup
 
 Two kinds of webhooks land at the server:

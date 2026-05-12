@@ -18,7 +18,7 @@ const PANKOSMIA_BRANCH_PREFIX: &str = "pankosmia-edit-";
 pub async fn list_pending_prs(
     cookies: &CookieJar<'_>,
     catalog: &State<Arc<CatalogRegistry>>,
-    app_auth: Option<&State<GithubAppAuth>>,
+    app_auth: &State<Option<GithubAppAuth>>,
     tokens: &State<TokenStore>,
     github_client: &State<GithubClient>,
     language: String,
