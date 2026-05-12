@@ -1,0 +1,28 @@
+# Secrets — never bake into image
+.env
+.env.*
+/secret/
+/internal-docs/
+
+# Build artefacts
+target/
+debug/
+build/
+**/*.rs.bk
+*.pdb
+
+# VCS + IDE
+.git/
+.gitignore
+.idea/
+.claude/
+
+# Local-dev / test scaffolding
+temp/
+test_runtime/
+tests/
+example/
+
+# Logs and OS noise
+*.log
+.DS_Store
