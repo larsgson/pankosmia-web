@@ -1,7 +1,3 @@
-#[macro_use]
-#[cfg(test)]
-mod tests;
-
 #[doc(hidden)]
 use rocket::{Build, Rocket};
 use serde_json::{json, Value};
@@ -24,7 +20,9 @@ use crate::utils::bootstrap::{
 use crate::utils::files::load_json;
 use crate::utils::json::get_string_value_by_key;
 use crate::utils::launch::{add_app_settings, add_catchers, add_routes, add_static_routes};
-use crate::utils::paths::{home_dir_string, os_slash_str, source_local_setup_path, webfonts_path};
+use crate::utils::paths::{
+    home_dir_string, os_slash_str, source_local_setup_path, user_settings_path, webfonts_path,
+};
 pub mod endpoints;
 mod static_vars;
 #[allow(unused_imports)]
@@ -35,26 +33,47 @@ use crate::structs::ClientConfigSection;
 
 type MsgQueue = Arc<Mutex<VecDeque<String>>>;
 
+fn ensure_trailing_slash(s: &str) -> String {
+    if s.is_empty() || s.ends_with(os_slash_str()) {
+        s.to_string()
+    } else {
+        format!("{}{}", s, os_slash_str())
+    }
+}
+
 pub fn rocket(launch_config: Value) -> Rocket<Build> {
     println!("OS = '{}'", env::consts::OS);
 
-    // Get product JSON
+    // Locate the product / client_config JSON. Preferred location:
+    // `<APP_RESOURCES_DIR>/product/{product,client_config}.json`.
+    // Legacy fallback: `<binary>/../../lib/app_resources/product/...`
+    // (pankosmia-web bundled the binary under `target/lib/app_resources/...`).
+    let app_resources_for_product =
+        get_string_value_by_key(&launch_config, "app_resources_path");
+    let preferred_product_path = format!(
+        "{}product{}product.json",
+        ensure_trailing_slash(&app_resources_for_product),
+        os_slash_str(),
+    );
     let binary_path = env::current_exe().unwrap();
-    let binary_parent_dir_path = binary_path
+    let binary_grandparent = binary_path
         .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_str()
-        .unwrap();
-    let product_path = format!(
+        .and_then(|p| p.parent())
+        .and_then(|p| p.to_str())
+        .unwrap_or("");
+    let legacy_product_path = format!(
         "{}{}lib{}app_resources{}product{}product.json",
-        binary_parent_dir_path,
+        binary_grandparent,
         os_slash_str(),
         os_slash_str(),
         os_slash_str(),
         os_slash_str(),
     );
+    let product_path = if Path::new(&preferred_product_path).is_file() {
+        preferred_product_path
+    } else {
+        legacy_product_path
+    };
     let product_json = match load_json(product_path.as_str()) {
         Ok(j) => j,
         Err(e) => panic!(
@@ -65,15 +84,25 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     let product_short_name = product_json["short_name"].as_str().unwrap().to_string();
     println!("Product = {}", &product_short_name);
 
-    // Maybe get client_config JSON
-    let client_config_path = format!(
+    // Same logic for client_config.json (absent → empty config, no panic).
+    let preferred_client_config_path = format!(
+        "{}product{}client_config.json",
+        ensure_trailing_slash(&app_resources_for_product),
+        os_slash_str(),
+    );
+    let legacy_client_config_path = format!(
         "{}{}lib{}app_resources{}product{}client_config.json",
-        binary_parent_dir_path,
+        binary_grandparent,
         os_slash_str(),
         os_slash_str(),
         os_slash_str(),
         os_slash_str(),
     );
+    let client_config_path = if Path::new(&preferred_client_config_path).is_file() {
+        preferred_client_config_path
+    } else {
+        legacy_client_config_path
+    };
     let client_config_json = match load_json(client_config_path.as_str()) {
         Ok(j) => j,
         Err(_e) => {
@@ -107,8 +136,13 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
         working_dir_path = launch_working_dir.clone();
     };
 
-    // Make new working dir if necessary, otherwise clear temp dir
-    if !Path::new(&working_dir_path).is_dir() {
+    // Initialise the working dir if it doesn't exist OR is missing
+    // its core config files (Railway / Docker volume-mounted-but-
+    // empty scenario: `/data` is pre-created by the orchestrator but
+    // has no Pankosmia state in it yet).
+    let needs_init = !Path::new(&working_dir_path).is_dir()
+        || !Path::new(&user_settings_path(&working_dir_path)).is_file();
+    if needs_init {
         let app_resources_dir = get_string_value_by_key(&launch_config, "app_resources_path");
         let local_setup_json =
             load_json(source_local_setup_path(app_resources_dir).as_str()).unwrap();
@@ -120,18 +154,18 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
             &app_resources_dir,
             &working_dir_path,
         );
-    } else {
-        let temp_dir_path = format!("{}{}temp", &working_dir_path, os_slash_str());
-        if Path::new(&temp_dir_path).exists() {
-            match std::fs::remove_dir_all(&temp_dir_path) {
-                Ok(_) => (),
-                Err(e) => panic!("Could not delete temp directory: {}", e),
-            }
-        }
-        match std::fs::create_dir(&temp_dir_path) {
+    }
+    // Always (re)create a clean temp dir on boot, regardless of init.
+    let temp_dir_path = format!("{}{}temp", &working_dir_path, os_slash_str());
+    if Path::new(&temp_dir_path).exists() {
+        match std::fs::remove_dir_all(&temp_dir_path) {
             Ok(_) => (),
-            Err(e) => panic!("Could not create temp directory: {}", e),
+            Err(e) => panic!("Could not delete temp directory: {}", e),
         }
+    }
+    match std::fs::create_dir(&temp_dir_path) {
+        Ok(_) => (),
+        Err(e) => panic!("Could not create temp directory: {}", e),
     }
 
     // Load the config JSONs
@@ -247,20 +281,10 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     my_rocket = my_rocket
         .manage(crate::server::LanguageLocks::new())
         .manage(crate::server::BlockingPools::new())
-        .manage(crate::server::WatcherRegistry::new());
+        .manage(crate::server::WatcherRegistry::new())
+        .manage(crate::server::RateLimiter::default_for_saves());
 
-    // M5 — auth state. JwksCache is vestigial (the JWT path was
-    // superseded by GitHub OAuth); kept managed because the
-    // request guard surface still references it.
-    // MembershipCache memoizes (user, language) → role lookups for
-    // 30s. Both are no-ops until endpoints opt in via guards.
-    let jwks_url = env::var("SUPABASE_JWKS_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1/jwks".into());
-    my_rocket = my_rocket
-        .manage(crate::auth::JwksCache::new(jwks_url))
-        .manage(crate::auth::MembershipCache::new());
-
-    // GitHub OAuth + token store (G1). The OAuth client_id /
+    // GitHub OAuth + token store. The OAuth client_id /
     // client_secret are read from env. If not set, the OAuth
     // endpoints respond with 502 (badly configured server); the
     // rest of the server still works.

@@ -1,5 +1,6 @@
-use crate::structs::AppSettings;
+use crate::endpoints::burrito2::github_save::{is_github_backend, not_implemented_github};
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, check_path_string_components, os_slash_str};
 use crate::utils::response::{
@@ -22,6 +23,9 @@ pub async fn post_delete_ingredients(
     repo_path: PathBuf,
     ipath: String,
 ) -> status::Custom<(ContentType, String)> {
+    if is_github_backend() {
+        return not_implemented_github("bulk delete (directory)");
+    }
     let path_components: Components<'_> = repo_path.components();
     let full_repo_path =
         store.workspace_root().to_string_lossy().into_owned() + os_slash_str() + &repo_path.display().to_string();

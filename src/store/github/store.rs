@@ -406,6 +406,10 @@ impl ProjectStore for GitHubLanguageStore {
         &self.workspace_root
     }
 
+    async fn prefetch_language(&self, lang: LanguageCode) -> StoreResult<()> {
+        self.ensure_language_clone(&lang).await.map(|_| ())
+    }
+
     // --- multi-write atomicity -----------------------------------
 
     async fn with_tx<'a>(

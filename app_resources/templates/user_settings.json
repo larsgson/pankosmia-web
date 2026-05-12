@@ -1,0 +1,15 @@
+{
+  "languages": ["en"],
+  "repo_dir": "%%WORKINGDIR%%/repos",
+  "app_resources_dir": "%%APPRESOURCESDIR%%",
+  "webfonts_dir": "%%WORKINGDIR%%/webfonts",
+  "typography": {
+    "font_set": "default",
+    "size": "14",
+    "direction": "ltr",
+    "features": {}
+  },
+  "my_clients": [],
+  "gitea_endpoints": {},
+  "auth_tokens": {}
+}

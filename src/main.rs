@@ -4,6 +4,15 @@ use rocket::fs::relative;
 
 #[rocket::main]
 pub async fn main() -> Result<(), rocket::Error> {
+    // Bridge PaaS-style `PORT` injection (Railway, Fly.io, Heroku-
+    // family) to Rocket's expected `ROCKET_PORT`. Only does anything
+    // when `ROCKET_PORT` is not already set — explicit config wins.
+    if env::var("ROCKET_PORT").is_err() {
+        if let Ok(port) = env::var("PORT") {
+            env::set_var("ROCKET_PORT", port);
+        }
+    }
+
     let args: Vec<String> = env::args().collect();
     let mut working_dir = "".to_string();
     if args.len() == 2 {

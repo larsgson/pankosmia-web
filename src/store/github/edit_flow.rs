@@ -1,6 +1,8 @@
 //! GitHub edit flow (App-model).
 //!
-//! Per save:
+//! Each save endpoint dispatches into `apply_op` with a `SaveOp`
+//! describing what to do on the working branch. Per call:
+//!
 //!   1. Resolve the language's upstream repo from the catalog.
 //!   2. Resolve the installation ID (per-language override → global
 //!      `PANKOSMIA_DEFAULT_INSTALLATION_ID`).
@@ -9,27 +11,24 @@
 //!   5. Working branch: `pankosmia-edit-<user-login>`. Look up the
 //!      user's existing open PR on that branch.
 //!        - If an open PR exists, the branch is left as-is and the
-//!          save appends a commit on top (audit-trail style).
+//!          op appends a commit on top (audit-trail style).
 //!        - Otherwise the branch is reset/created at upstream HEAD
 //!          so a stale-from-merged-session branch doesn't
 //!          accidentally re-PR old work.
-//!   6. Fetch the existing blob SHA at the file path on the working
-//!      branch.
-//!   7. `PUT /repos/{repo}/contents/{path}` with new bytes, the
-//!      blob SHA (if any), and a commit message carrying a
-//!      `Co-authored-by: <user-login>` trailer for attribution.
-//!   8. If no open PR was found in step 5, open one for the branch.
+//!   6. Apply the op via the Contents API (PUT/DELETE), with a
+//!      commit message carrying a `Co-authored-by: <user-login>`
+//!      trailer for attribution.
+//!   7. If no open PR was found in step 5, open one for the branch.
 //!
 //! No git2, no per-user disk state, no forks. Per-language locks
-//! serialize concurrent saves on the same language so we don't race
-//! on the PR-lookup → branch-state → PUT sequence.
+//! serialize concurrent ops on the same language so we don't race
+//! on the PR-lookup → branch-state → write sequence.
 //!
-//! Note: a previous draft of this module reset the working branch to
-//! upstream HEAD on every save. That triggered GitHub's auto-close
-//! behaviour: the brief no-diff window between reset and PUT closed
-//! any open PR for the branch, causing each save to mint a fresh PR.
-//! `internal-docs/AUTH_MODEL.md` §7 records the resulting decision (commits
-//! accumulate within a session, reviewer can squash at merge).
+//! Note: a previous draft reset the working branch to upstream HEAD
+//! on every save, which triggered GitHub's PR auto-close behaviour
+//! during the brief no-diff window. `internal-docs/AUTH_MODEL.md` §7
+//! records the resulting decision (commits accumulate within a
+//! session, reviewer can squash at merge).
 
 use crate::auth::github_client::{GithubError, GithubPullRequest};
 use crate::auth::{resolve_installation_id, GithubAppAuth, GithubAppError, GithubClient};
@@ -49,6 +48,10 @@ pub enum EditFlowError {
     GithubApp(String),
     #[error("language '{0}' not registered in catalog")]
     UnknownLanguage(String),
+    #[error("not found: {0}")]
+    NotFound(String),
+    #[error("invalid argument: {0}")]
+    Invalid(String),
 }
 
 impl From<GithubError> for EditFlowError {
@@ -71,6 +74,28 @@ pub struct SaveOutcome {
     pub branch: String,
 }
 
+/// What to do on the working branch in this call. Each variant maps
+/// to one or two Contents-API operations.
+#[derive(Debug)]
+pub enum SaveOp<'a> {
+    /// Create or replace one ingredient file.
+    Put { ipath: &'a str, bytes: &'a [u8] },
+    /// Delete one ingredient file from the working branch.
+    Delete { ipath: &'a str },
+    /// Copy `src_ipath` to `target_ipath` (read source bytes from
+    /// working branch, write to target). Optionally remove the
+    /// source afterwards.
+    Copy {
+        src_ipath: &'a str,
+        target_ipath: &'a str,
+        delete_src: bool,
+    },
+    /// Revert an ingredient to whatever upstream HEAD says, undoing
+    /// any working-branch changes to that file. If the file doesn't
+    /// exist at upstream HEAD, removes it from the working branch.
+    Revert { ipath: &'a str },
+}
+
 pub struct GithubEditFlow {
     registry: Arc<CatalogRegistry>,
 }
@@ -80,15 +105,15 @@ impl GithubEditFlow {
         Self { registry }
     }
 
-    /// Save → ensure-branch → PUT-contents → PR. Returns the PR's
-    /// URL and number.
-    pub async fn save_ingredient(
+    /// Apply a `SaveOp` to the user's working branch, ensuring the
+    /// branch state and PR are consistent. Returns the PR's URL and
+    /// number.
+    pub async fn apply_op(
         &self,
         login: &str,
         github_user_id: i64,
         lang: LanguageCode,
-        ipath: &str,
-        bytes: &[u8],
+        op: SaveOp<'_>,
         commit_message: &str,
         github_client: &GithubClient,
         app_auth: &GithubAppAuth,
@@ -103,9 +128,6 @@ impl GithubEditFlow {
         let installation_id = resolve_installation_id(entry.installation_id, lang.as_str())?;
         let token = app_auth.installation_token(installation_id).await?;
 
-        // Look up the upstream default branch. Catalog doesn't carry
-        // this, so we ask GitHub once per save. (Cheap; could be
-        // cached in the catalog entry later.)
         let upstream_repo = github_client.get_repo(&token, &upstream).await?;
         let base_branch = upstream_repo
             .default_branch
@@ -119,8 +141,7 @@ impl GithubEditFlow {
             .ok_or_else(|| EditFlowError::Github(format!("malformed upstream: {}", upstream)))?
             .to_string();
 
-        // Serialise concurrent saves on the same language so we
-        // don't race on the PR-lookup → branch-state → PUT sequence.
+        // Serialise concurrent ops on the same language.
         let lock = locks.for_language(&lang);
         let _guard = lock.write().await;
 
@@ -134,11 +155,6 @@ impl GithubEditFlow {
                 ))
             })?;
 
-        // Look up the user's existing open PR for this branch BEFORE
-        // touching the branch. If one exists we're continuing a
-        // session and the branch must be left alone (force-resetting
-        // would make GitHub auto-close the PR during the brief
-        // no-diff window).
         let head_query = format!("{}:{}", owner, working_branch);
         let existing_pr: Option<GithubPullRequest> = github_client
             .list_pulls(&token, &upstream, Some(&head_query), Some(&base_branch), "open")
@@ -151,60 +167,165 @@ impl GithubEditFlow {
             .is_some();
 
         match (&existing_pr, branch_exists) {
-            (Some(_), true) => {
-                // Continuing a live session — leave the branch alone.
-            }
+            (Some(_), true) => { /* continuing session */ }
             (Some(_), false) => {
-                // PR open but branch missing. Shouldn't normally
-                // happen; recreate the branch and the next save
-                // commit lands on it.
                 github_client
                     .create_branch(&token, &upstream, &working_branch, &upstream_head)
                     .await?;
             }
             (None, true) => {
-                // Stale branch from a merged or manually-closed
-                // previous session — reset to upstream HEAD so we
-                // don't accumulate on top of merged history.
                 github_client
                     .update_branch(&token, &upstream, &working_branch, &upstream_head, true)
                     .await?;
             }
             (None, false) => {
-                // Fresh start.
                 github_client
                     .create_branch(&token, &upstream, &working_branch, &upstream_head)
                     .await?;
             }
         }
 
-        // PUT the file. blob SHA reflects whatever's currently on the
-        // working branch — for continuing sessions that's the user's
-        // most recent commit on this file; for fresh branches it
-        // matches upstream HEAD (or None if the file is new).
-        let blob_sha = github_client
-            .get_file_blob_sha(&token, &upstream, &content_path(ipath), &working_branch)
-            .await?;
         let coauthor_email =
             format!("{}+{}@{}", github_user_id, login, COMMIT_AUTHOR_EMAIL_DOMAIN);
         let full_message = format!(
             "{}\n\nCo-authored-by: {} <{}>",
             commit_message, login, coauthor_email
         );
-        github_client
-            .put_file_contents(
-                &token,
-                &upstream,
-                &content_path(ipath),
-                &working_branch,
-                bytes,
-                &full_message,
-                blob_sha.as_deref(),
-            )
-            .await?;
 
-        // Reuse the open PR or open a new one (we already looked up
-        // open PRs at the top of the function).
+        match op {
+            SaveOp::Put { ipath, bytes } => {
+                let path = content_path(ipath);
+                let blob_sha = github_client
+                    .get_file_blob_sha(&token, &upstream, &path, &working_branch)
+                    .await?;
+                github_client
+                    .put_file_contents(
+                        &token,
+                        &upstream,
+                        &path,
+                        &working_branch,
+                        bytes,
+                        &full_message,
+                        blob_sha.as_deref(),
+                    )
+                    .await?;
+            }
+            SaveOp::Delete { ipath } => {
+                let path = content_path(ipath);
+                let blob_sha = github_client
+                    .get_file_blob_sha(&token, &upstream, &path, &working_branch)
+                    .await?
+                    .ok_or_else(|| {
+                        EditFlowError::NotFound(format!("ingredient '{}' not on branch", ipath))
+                    })?;
+                github_client
+                    .delete_file_contents(
+                        &token,
+                        &upstream,
+                        &path,
+                        &working_branch,
+                        &full_message,
+                        &blob_sha,
+                    )
+                    .await?;
+            }
+            SaveOp::Copy {
+                src_ipath,
+                target_ipath,
+                delete_src,
+            } => {
+                if src_ipath == target_ipath {
+                    return Err(EditFlowError::Invalid(
+                        "src and target must be different".into(),
+                    ));
+                }
+                let src_path = content_path(src_ipath);
+                let target_path = content_path(target_ipath);
+                let src_bytes = github_client
+                    .get_file_bytes(&token, &upstream, &src_path, &working_branch)
+                    .await?
+                    .ok_or_else(|| {
+                        EditFlowError::NotFound(format!("source '{}' not on branch", src_ipath))
+                    })?;
+                let target_blob_sha = github_client
+                    .get_file_blob_sha(&token, &upstream, &target_path, &working_branch)
+                    .await?;
+                github_client
+                    .put_file_contents(
+                        &token,
+                        &upstream,
+                        &target_path,
+                        &working_branch,
+                        &src_bytes,
+                        &full_message,
+                        target_blob_sha.as_deref(),
+                    )
+                    .await?;
+                if delete_src {
+                    // Re-read source blob SHA — the PUT above may have
+                    // changed branch HEAD, so a fresh lookup is safest.
+                    if let Some(src_sha) = github_client
+                        .get_file_blob_sha(&token, &upstream, &src_path, &working_branch)
+                        .await?
+                    {
+                        let delete_msg = format!("{} (delete src)", full_message);
+                        github_client
+                            .delete_file_contents(
+                                &token,
+                                &upstream,
+                                &src_path,
+                                &working_branch,
+                                &delete_msg,
+                                &src_sha,
+                            )
+                            .await?;
+                    }
+                }
+            }
+            SaveOp::Revert { ipath } => {
+                let path = content_path(ipath);
+                let upstream_bytes = github_client
+                    .get_file_bytes(&token, &upstream, &path, &base_branch)
+                    .await?;
+                let branch_blob_sha = github_client
+                    .get_file_blob_sha(&token, &upstream, &path, &working_branch)
+                    .await?;
+                match (upstream_bytes, branch_blob_sha) {
+                    (Some(bytes), maybe_sha) => {
+                        github_client
+                            .put_file_contents(
+                                &token,
+                                &upstream,
+                                &path,
+                                &working_branch,
+                                &bytes,
+                                &full_message,
+                                maybe_sha.as_deref(),
+                            )
+                            .await?;
+                    }
+                    (None, Some(sha)) => {
+                        github_client
+                            .delete_file_contents(
+                                &token,
+                                &upstream,
+                                &path,
+                                &working_branch,
+                                &full_message,
+                                &sha,
+                            )
+                            .await?;
+                    }
+                    (None, None) => {
+                        return Err(EditFlowError::NotFound(format!(
+                            "ingredient '{}' not present at upstream or on branch",
+                            ipath
+                        )));
+                    }
+                }
+            }
+        }
+
         let pr: GithubPullRequest = if let Some(p) = existing_pr {
             p
         } else {

@@ -1,7 +1,9 @@
-use crate::auth::session::read_session;
 use crate::auth::{GithubAppAuth, GithubClient, LanguageHeader, TokenStore};
-use crate::server::LanguageLocks;
-use crate::store::github::GithubEditFlow;
+use crate::endpoints::burrito2::github_save::{
+    handle_github_op, is_github_backend, validate_ipath_segments,
+};
+use crate::server::{LanguageLocks, RateLimiter};
+use crate::store::github::{GithubEditFlow, SaveOp};
 use crate::structs::{AppSettings, BurritoMetadata};
 use crate::utils::burrito::{
     destination_parent, ingredients_metadata_from_files, ingredients_scopes_from_files,
@@ -9,14 +11,13 @@ use crate::utils::burrito::{
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, check_path_string_components, os_slash_str};
 use crate::utils::response::{
-    not_ok_bad_repo_json_response, not_ok_json_response, ok_json_response, ok_ok_json_response,
+    not_ok_bad_repo_json_response, not_ok_json_response, ok_ok_json_response,
 };
 use rocket::http::{ContentType, CookieJar, Status};
 use rocket::response::status;
 use rocket::serde::json::Json;
 use rocket::{post, State};
 use serde_json::Value;
-use std::env;
 use std::path::{Components, PathBuf};
 
 /// *`POST /ingredient/raw/<repo_path>?ipath=my_burrito_path&update_ingredients&no_bak`*
@@ -47,6 +48,7 @@ pub async fn post_raw_ingredient(
     tokens: &State<TokenStore>,
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,
+    rate_limiter: &State<RateLimiter>,
     language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
     ipath: String,
@@ -55,16 +57,31 @@ pub async fn post_raw_ingredient(
     json_form: Json<Value>,
 ) -> status::Custom<(ContentType, String)> {
     if is_github_backend() {
-        return handle_github_save(
+        if let Err(resp) = validate_ipath_segments(&[&ipath]) {
+            return resp;
+        }
+        let payload = match json_form.0.get("payload").and_then(|v| v.as_str()) {
+            Some(s) => s.to_string(),
+            None => {
+                return not_ok_json_response(
+                    Status::BadRequest,
+                    make_bad_json_data_response("missing or non-string 'payload'".into()),
+                );
+            }
+        };
+        let bytes = payload.into_bytes();
+        let commit_message = format!("pankosmia: edit {}", ipath);
+        return handle_github_op(
             cookies,
             edit_flow,
             app_auth,
             tokens,
             github_client,
             locks,
+            rate_limiter,
             language_header,
-            &ipath,
-            &json_form,
+            SaveOp::Put { ipath: &ipath, bytes: &bytes },
+            &commit_message,
         )
         .await;
     }
@@ -184,124 +201,3 @@ pub async fn post_raw_ingredient(
     }
 }
 
-fn is_github_backend() -> bool {
-    env::var("STORAGE_BACKEND")
-        .map(|v| v.eq_ignore_ascii_case("github"))
-        .unwrap_or(false)
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn handle_github_save(
-    cookies: &CookieJar<'_>,
-    edit_flow: &State<GithubEditFlow>,
-    app_auth: Option<&State<GithubAppAuth>>,
-    tokens: &State<TokenStore>,
-    github_client: &State<GithubClient>,
-    locks: &State<LanguageLocks>,
-    language_header: Option<LanguageHeader>,
-    ipath: &str,
-    json_form: &Json<Value>,
-) -> status::Custom<(ContentType, String)> {
-    let github_user_id = match read_session(cookies) {
-        Some(id) => id,
-        None => {
-            return not_ok_json_response(
-                Status::Unauthorized,
-                make_bad_json_data_response("not signed in".into()),
-            );
-        }
-    };
-    let lang = match language_header {
-        Some(LanguageHeader(l)) => l,
-        None => {
-            return not_ok_json_response(
-                Status::BadRequest,
-                make_bad_json_data_response(
-                    "X-Language-Code header required for GitHub backend".into(),
-                ),
-            );
-        }
-    };
-    if !check_path_string_components(ipath.to_string()) {
-        return not_ok_json_response(
-            Status::BadRequest,
-            make_bad_json_data_response("bad ingredient path".into()),
-        );
-    }
-    let token = match tokens.load(github_user_id) {
-        Ok(Some(t)) => t,
-        Ok(None) => {
-            return not_ok_json_response(
-                Status::Unauthorized,
-                make_bad_json_data_response(
-                    "no stored token; please sign in again".into(),
-                ),
-            );
-        }
-        Err(e) => {
-            return not_ok_json_response(
-                Status::InternalServerError,
-                make_bad_json_data_response(format!("token store: {}", e)),
-            );
-        }
-    };
-    let user = match github_client.get_user(&token).await {
-        Ok(u) => u,
-        Err(e) => {
-            return not_ok_json_response(
-                Status::BadGateway,
-                make_bad_json_data_response(format!("github /user: {}", e)),
-            );
-        }
-    };
-    let payload = match json_form.0.get("payload").and_then(|v| v.as_str()) {
-        Some(s) => s.to_string(),
-        None => {
-            return not_ok_json_response(
-                Status::BadRequest,
-                make_bad_json_data_response("missing or non-string 'payload'".into()),
-            );
-        }
-    };
-    let app_auth = match app_auth {
-        Some(a) => a.inner(),
-        None => {
-            return not_ok_json_response(
-                Status::ServiceUnavailable,
-                make_bad_json_data_response(
-                    "GitHub App auth not configured (GITHUB_APP_ID unset?)".into(),
-                ),
-            );
-        }
-    };
-    let commit_message = format!("pankosmia: edit {}", ipath);
-    match edit_flow
-        .save_ingredient(
-            &user.login,
-            github_user_id,
-            lang,
-            ipath,
-            &payload.into_bytes(),
-            &commit_message,
-            github_client.inner(),
-            app_auth,
-            locks.inner(),
-        )
-        .await
-    {
-        Ok(outcome) => {
-            let body = serde_json::json!({
-                "is_good": true,
-                "status": outcome.status,
-                "branch": outcome.branch,
-                "pr_url": outcome.pr_url,
-                "pr_number": outcome.pr_number,
-            });
-            ok_json_response(body.to_string())
-        }
-        Err(e) => not_ok_json_response(
-            Status::BadGateway,
-            make_bad_json_data_response(format!("github edit flow: {}", e)),
-        ),
-    }
-}

@@ -19,6 +19,8 @@ use rocket::request::{FromRequest, Outcome, Request};
 use rocket::response::status;
 use rocket::{post, State};
 
+use crate::identity::LanguageCode;
+use crate::store::SharedProjectStore;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::response::{not_ok_json_response, ok_json_response};
 
@@ -146,6 +148,7 @@ pub async fn catalog_webhook(
 pub async fn language_webhook(
     sig: GithubSignature,
     secret: &State<WebhookSecret>,
+    store: &State<SharedProjectStore>,
     code: &str,
     body: Data<'_>,
 ) -> status::Custom<(ContentType, String)> {
@@ -176,7 +179,29 @@ pub async fn language_webhook(
             make_bad_json_data_response("signature mismatch".into()),
         );
     }
-    let _ = code; // refresh wiring lands with G3.
+    let lang = match LanguageCode::parse(code) {
+        Ok(l) => l,
+        Err(_) => {
+            return not_ok_json_response(
+                Status::BadRequest,
+                make_bad_json_data_response(format!("invalid language code: {}", code)),
+            );
+        }
+    };
+    // Kick off the fetch in the background so the webhook returns
+    // quickly (GitHub retries on slow webhooks). The
+    // WatcherRegistry will pick up the resulting file mtime changes
+    // and broadcast SSE events to subscribers.
+    let store_clone = store.inner().clone();
+    tokio::spawn(async move {
+        if let Err(e) = store_clone.prefetch_language(lang.clone()).await {
+            eprintln!(
+                "language webhook prefetch failed for {}: {}",
+                lang.as_str(),
+                e
+            );
+        }
+    });
     ok_json_response(r#"{"is_good":true,"reason":"queued"}"#.into())
 }
 
@@ -191,7 +216,7 @@ mod tests {
         // Pre-computed sha256 hmac of "hello" with key "test-secret":
         // openssl: echo -n "hello" | openssl dgst -sha256 -hmac "test-secret"
         let header =
-            "sha256=88aab3ede8d3adf94d26ab90d3bafd4a2083070c3bcce9c014ee04a443847c0b";
+            "sha256=bcc889a40667cab715e1dc22ad280692cf4bf1c3a280eeeca60d8dbcd8e4b993";
         assert!(verify_signature(secret, body, header));
     }
 

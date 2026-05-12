@@ -147,6 +147,15 @@ pub trait ProjectStore: Send + Sync {
     /// this stable across the lifetime of the process.
     fn workspace_root(&self) -> &Path;
 
+    /// Refresh local cache for a language (clone if missing, fetch
+    /// otherwise). Called by the language webhook to mirror an
+    /// upstream merge into the shared read cache, so SSE subscribers
+    /// see the updated mtimes via `WatcherRegistry`. FS implementations
+    /// are a no-op (no upstream to fetch).
+    async fn prefetch_language(&self, _lang: LanguageCode) -> StoreResult<()> {
+        Ok(())
+    }
+
     // --- multi-write atomicity ------------------------------------
     //
     // The FS impl is a no-op wrapper (single-process, single-thread

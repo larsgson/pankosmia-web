@@ -1,11 +1,12 @@
-use crate::structs::AppSettings;
+use crate::endpoints::burrito2::github_save::{is_github_backend, not_implemented_github};
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
+use crate::utils::burrito::destination_parent;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, check_path_string_components, os_slash_str};
 use crate::utils::response::{
     not_ok_bad_repo_json_response, not_ok_json_response, ok_ok_json_response,
 };
-use crate::utils::burrito::{destination_parent};
 use rocket::form::{Form, FromForm};
 use rocket::fs::TempFile;
 use rocket::http::{ContentType, Status};
@@ -37,6 +38,9 @@ pub async fn post_zipped_ingredient(
     ipath: String,
     mut form: Form<Upload<'_>>,
 ) -> status::Custom<(ContentType, String)> {
+    if is_github_backend() {
+        return not_implemented_github("zipped multi-file upload");
+    }
     let path_components: Components<'_> = repo_path.components();
     let full_repo_path =
         format!("{}{}{}", store.workspace_root().to_string_lossy().into_owned(), os_slash_str(), &repo_path.display().to_string());

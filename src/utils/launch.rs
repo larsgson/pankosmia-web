@@ -17,6 +17,7 @@ pub(crate) fn add_routes(rocket_instance: Rocket<Build>) -> Rocket<Build> {
                 endpoints::clients::list_clients,
                 endpoints::clients::client_interfaces,
                 endpoints::version::get_version,
+                endpoints::health::get_health,
                 endpoints::clients::client_config,
                 // G1: GitHub OAuth + session.
                 crate::auth::oauth_flow::auth_github_start,
@@ -51,6 +52,12 @@ pub(crate) fn add_routes(rocket_instance: Rocket<Build>) -> Rocket<Build> {
             endpoints::atomics::debug::debug_status,
             endpoints::atomics::debug::debug_enable,
             endpoints::atomics::debug::debug_disable
+        ])
+        .mount("/admin", routes![
+            endpoints::admin::list_pending_prs,
+            endpoints::admin::list_pr_files,
+            endpoints::admin::approve_pr,
+            endpoints::admin::reject_pr
         ])
         .mount("/temp", routes![
             endpoints::temp_file::read_temp_file::read_temp_file,

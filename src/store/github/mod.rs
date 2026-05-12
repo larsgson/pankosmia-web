@@ -8,5 +8,5 @@
 pub mod edit_flow;
 pub mod store;
 
-pub use edit_flow::{EditFlowError, GithubEditFlow, SaveOutcome};
+pub use edit_flow::{EditFlowError, GithubEditFlow, SaveOp, SaveOutcome};
 pub use store::GitHubLanguageStore;

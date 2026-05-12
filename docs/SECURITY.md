@@ -211,7 +211,117 @@ completes that one request; the next is denied. Acceptable.
 
 ---
 
-## 4. Path traversal
+## 4. Edit spam and content abuse
+
+Because the GitHub backend exposes save endpoints to anyone who can
+authenticate against the App, the system has to assume some
+fraction of edits will be hostile, low-quality, or low-effort
+vandalism. The design choices below limit the blast radius before
+software mitigations even apply; the rest is defense in depth.
+
+### Properties of the design that already limit blast radius
+
+- **Per-user PR isolation.** Each user's edits land on a
+  user-specific working branch (`pankosmia-edit-<login>`) and a
+  user-specific PR. A bad actor's spam stays in *their* PR;
+  legitimate contributors' PRs are separate and untouched. The
+  reviewer can close one bad user's PR without disrupting anyone
+  else.
+- **Identity-bound contribution.** Translation work is not
+  anonymous by its nature — language communities are small and
+  contributors are known by name. A GitHub-login-bound PR makes
+  social trust the front-line defense and software the backup.
+- **No write capability granted to users.** The user's
+  user-to-server token has no scopes. Even if it leaked, the
+  attacker could only call `GET /user` as the victim — not write
+  to any repo.
+- **GitHub-native admin tools.** Language admins can block
+  abusive users from contributing via GitHub's collaborator UI;
+  the App's installation token honours the resulting 403s.
+
+### Threats and mitigations
+
+**T19: Single-account high-volume spam.** A signed-in user runs a
+script that POSTs thousands of saves.
+*Mitigation*: per-user save rate limit (60 saves / 15 min sliding
+window) at `src/server/rate_limit.rs::RateLimiter`. Wired into
+`endpoints/burrito2/github_save.rs::handle_github_op` BEFORE any
+GitHub API call, so the 429 is fast and the App's installation-
+token quota is not consumed. In-memory only; restarts reset the
+counter, which is acceptable for the anti-spam role.
+
+**T20: Oversized payload exhausting bandwidth or hitting GitHub
+Contents API limits.** A save with a >1 MB body would also be
+rejected by GitHub with a less-clear error.
+*Mitigation*: `MAX_INGREDIENT_BYTES = 700_000` cap on `SaveOp::Put`
+in the github_save helper. Conservatively below GitHub's 1 MB
+Contents-API ceiling to leave headroom for base64 expansion and the
+JSON envelope. Returns 413 with a clear message before any GitHub
+call. Larger files need the Git Data API path (deferred future
+work).
+
+**T21: Coordinated multi-account attack.** Several GitHub accounts
+each open a PR with junk. The per-user rate limit doesn't help —
+each account stays under its own threshold.
+*Mitigation (planned, not yet implemented)*: per-language **block
+list** living in the language repo as
+`pankosmia/blocked.json` (or similar). The App reads it via its
+installation token, caches in memory with a short TTL, and
+rejects saves with 403 for any user-id in the list. Admin
+maintains it via PR or a small `/admin/block` endpoint. Cheap to
+read, instant to take effect, lives with the content it gates.
+
+**T22: Reviewer overload from too many low-quality PRs.** Even
+non-malicious noise (well-meaning but unskilled edits) can swamp
+small admin teams.
+*Mitigation (planned)*: per-language **trusted-contributors list**
+(also living in the language repo as `pankosmia/trusted.json`).
+Trusted users' PRs are flagged for the auto-merge-on-CI-pass path
+once that ships; untrusted users' PRs surface in the admin queue
+with an `[unvetted]` marker. Combined with `/review` admin
+endpoints, this triages humans toward the PRs most likely to need
+careful review.
+
+### Server limits to set in production
+
+Operators should tighten Rocket's default form-data limits in
+production. The defaults (128 MiB across most categories) are too
+generous for the hosted use case; **set
+`ROCKET_LIMITS='{json="64KiB",data-form="2MiB",file="2MiB",string="64KiB"}'`**
+or similar via env, sized to your real per-endpoint needs. The
+700-KB per-ingredient cap inside the App flow is independent of
+this Rocket-side limit — both should be set tight.
+
+### Deferred mitigations
+
+These were considered for v1 and deliberately not built because
+the cheaper measures above are sufficient for the expected attack
+profile:
+
+- **Per-PR commit-count cap** (refuse new saves when the open PR
+  has >N commits): would require an extra GitHub API call per
+  save (`compare` or `pulls/{n}`) for marginal value, given T19's
+  rate limit already caps saves per user.
+- **Server-side moderation queue** (first save from a new user
+  lands in a pending queue, admin promotes to PR): heavy
+  implementation, only justified under active coordinated attack.
+  Revisit if the threat materialises.
+- **CAPTCHA on first save from a new account**: friction for
+  legitimate translators; only justified if T21 mitigations prove
+  insufficient.
+
+### Roles in the response
+
+| Situation | Who acts | What action |
+|---|---|---|
+| One user spams a single PR | reviewer | Close PR; block user on the language repo via GitHub UI |
+| One user keeps signing in and creating new branches | reviewer + ops | Add user-id to language's `blocked.json` |
+| Many bot-driven accounts spam | reviewer + ops | Block at GitHub-org level; investigate via audit log; raise to GitHub if abusive |
+| Sustained vandalism that survives blocking | ops | Tighten App permissions; consider temporary read-only mode on the language repo |
+
+---
+
+## 5. Path traversal
 
 ### The risk
 
@@ -268,7 +378,7 @@ confined to that prefix; user content never touches it.
 
 ---
 
-## 5. Audio / object-storage uploads
+## 6. Audio / object-storage uploads
 
 ### Threats and mitigations
 
@@ -303,7 +413,7 @@ presigned tokens before long-term retention.
 
 ---
 
-## 6. Webhook security
+## 7. Webhook security
 
 GitHub webhook receivers verify the HMAC-SHA256 signature in
 `X-Hub-Signature-256` against `GITHUB_WEBHOOK_SECRET` before
@@ -322,7 +432,7 @@ costs at most one extra fetch.
 
 ---
 
-## 7. Secrets management
+## 8. Secrets management
 
 The crate reads secrets from environment variables, not config
 files:
@@ -354,7 +464,7 @@ grep -rIn "println!\|tracing::" src/ \
 
 ---
 
-## 8. Audit logging
+## 9. Audit logging
 
 ### What's logged
 
@@ -391,7 +501,7 @@ disk should allow append but not modify by the server's user.
 
 ---
 
-## 9. Defense-in-depth layer summary
+## 10. Defense-in-depth layer summary
 
 A request to a per-language endpoint passes through:
 

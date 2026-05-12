@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod sse;
 pub mod navigation;
 pub mod clients;
@@ -10,6 +11,7 @@ pub mod settings2;
 pub mod i18n2;
 pub mod atomics;
 pub mod content_utils2;
+pub mod health;
 pub mod version;
 pub mod video;
 pub mod temp_file;

@@ -1,5 +1,6 @@
-use crate::structs::{AppSettings, BurritoMetadata};
+use crate::endpoints::burrito2::github_save::{is_github_backend, not_implemented_github};
 use crate::store::SharedProjectStore;
+use crate::structs::{AppSettings, BurritoMetadata};
 use crate::utils::burrito::{
     ingredients_metadata_from_files, ingredients_scopes_from_files,
 };
@@ -26,6 +27,9 @@ pub async fn remake_ingredients_metadata(
     store: &State<SharedProjectStore>,
     repo_path: PathBuf,
 ) -> status::Custom<(ContentType, String)> {
+    if is_github_backend() {
+        return not_implemented_github("metadata regeneration");
+    }
     let path_components: Components<'_> = repo_path.components();
     let full_repo_path = format!(
         "{}{}{}",

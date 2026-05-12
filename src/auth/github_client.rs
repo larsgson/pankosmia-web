@@ -201,24 +201,125 @@ impl GithubClient {
             .map_err(|e| GithubError::Decode(e.to_string()))
     }
 
-    /// `PUT /repos/{upstream}/pulls/{n}/merge` — merge a PR.
+    /// `PUT /repos/{upstream}/pulls/{n}/merge` — merge a PR with
+    /// the requested method (`merge`, `squash`, or `rebase`).
+    /// Returns the resulting merge commit SHA.
     pub async fn merge_pull_request(
         &self,
         token: &str,
         upstream: &str,
         pr_number: u64,
-    ) -> Result<(), GithubError> {
+        merge_method: &str,
+    ) -> Result<String, GithubError> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            merge_method: &'a str,
+        }
         let resp = self
             .inner
-            .put(format!("{}/repos/{}/pulls/{}/merge", GITHUB_API, upstream, pr_number))
+            .put(format!(
+                "{}/repos/{}/pulls/{}/merge",
+                GITHUB_API, upstream, pr_number
+            ))
             .bearer_auth(token)
             .header("Accept", "application/vnd.github+json")
-            .header("Content-Length", "0")
+            .json(&Body { merge_method })
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        map_status(&resp)?;
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GithubError::Decode(e.to_string()))?;
+        let sha = v
+            .get("sha")
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| GithubError::Decode("no sha in merge response".into()))?
+            .to_string();
+        Ok(sha)
+    }
+
+    /// `PATCH /repos/{upstream}/pulls/{n}` — close a PR without
+    /// merging.
+    pub async fn close_pull_request(
+        &self,
+        token: &str,
+        upstream: &str,
+        pr_number: u64,
+    ) -> Result<(), GithubError> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            state: &'a str,
+        }
+        let resp = self
+            .inner
+            .patch(format!(
+                "{}/repos/{}/pulls/{}",
+                GITHUB_API, upstream, pr_number
+            ))
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .json(&Body { state: "closed" })
             .send()
             .await
             .map_err(|e| GithubError::Network(e.to_string()))?;
         map_status(&resp)?;
         Ok(())
+    }
+
+    /// `POST /repos/{upstream}/issues/{n}/comments` — add a comment
+    /// to a PR (PRs are issues for the comments API).
+    pub async fn add_pr_comment(
+        &self,
+        token: &str,
+        upstream: &str,
+        pr_number: u64,
+        body: &str,
+    ) -> Result<(), GithubError> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            body: &'a str,
+        }
+        let resp = self
+            .inner
+            .post(format!(
+                "{}/repos/{}/issues/{}/comments",
+                GITHUB_API, upstream, pr_number
+            ))
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .json(&Body { body })
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        map_status(&resp)?;
+        Ok(())
+    }
+
+    /// `GET /repos/{upstream}/pulls/{n}/files` — list the files
+    /// changed in a PR (paginated; this returns the first 100).
+    pub async fn list_pull_files(
+        &self,
+        token: &str,
+        upstream: &str,
+        pr_number: u64,
+    ) -> Result<Vec<GithubPullFile>, GithubError> {
+        let resp = self
+            .inner
+            .get(format!(
+                "{}/repos/{}/pulls/{}/files?per_page=100",
+                GITHUB_API, upstream, pr_number
+            ))
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        map_status(&resp)?;
+        resp.json::<Vec<GithubPullFile>>()
+            .await
+            .map_err(|e| GithubError::Decode(e.to_string()))
     }
 
     /// `GET /repos/{upstream}/pulls?head={owner}:{branch}&base={base}&state={state}`
@@ -405,6 +506,99 @@ impl GithubClient {
         Ok(Some(sha))
     }
 
+    /// `GET /repos/{repo}/contents/{path}?ref={ref}` — fetch the
+    /// decoded file bytes for a path. Returns `Ok(None)` on 404.
+    /// Used for `revert` (read upstream HEAD's blob) and `copy`
+    /// (read source blob before writing to target path).
+    pub async fn get_file_bytes(
+        &self,
+        token: &str,
+        repo: &str,
+        path: &str,
+        ref_: &str,
+    ) -> Result<Option<Vec<u8>>, GithubError> {
+        use base64::Engine as _;
+        let url = format!(
+            "{}/repos/{}/contents/{}?ref={}",
+            GITHUB_API,
+            repo,
+            path,
+            urlencoding::encode(ref_)
+        );
+        let resp = self
+            .inner
+            .get(url)
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        if resp.status().as_u16() == 404 {
+            return Ok(None);
+        }
+        map_status(&resp)?;
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GithubError::Decode(e.to_string()))?;
+        // Contents API returns base64 with newlines (PEM-style).
+        let b64 = v
+            .get("content")
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| GithubError::Decode("no content in response".into()))?
+            .replace('\n', "");
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .map_err(|e| GithubError::Decode(format!("base64: {}", e)))?;
+        Ok(Some(bytes))
+    }
+
+    /// `DELETE /repos/{repo}/contents/{path}` — delete a file on a
+    /// branch. Requires the current blob SHA (no implicit "last
+    /// writer wins"). Returns the resulting commit SHA.
+    pub async fn delete_file_contents(
+        &self,
+        token: &str,
+        repo: &str,
+        path: &str,
+        branch: &str,
+        message: &str,
+        blob_sha: &str,
+    ) -> Result<String, GithubError> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            message: &'a str,
+            branch: &'a str,
+            sha: &'a str,
+        }
+        let resp = self
+            .inner
+            .delete(format!("{}/repos/{}/contents/{}", GITHUB_API, repo, path))
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .json(&Body {
+                message,
+                branch,
+                sha: blob_sha,
+            })
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        map_status(&resp)?;
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GithubError::Decode(e.to_string()))?;
+        let sha = v
+            .pointer("/commit/sha")
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| {
+                GithubError::Decode("no /commit/sha in DELETE contents response".into())
+            })?
+            .to_string();
+        Ok(sha)
+    }
+
     /// `PUT /repos/{repo}/contents/{path}` — create or update a file
     /// in one call. If `existing_blob_sha` is `Some`, this is an
     /// update (must match the current blob SHA on the target branch).
@@ -521,6 +715,37 @@ pub struct GithubPullRequest {
     pub number: u64,
     pub html_url: String,
     pub state: String,
+    pub title: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub user: Option<GithubUserStub>,
+    pub head: Option<GithubRef>,
+}
+
+/// Minimal user stub embedded in PR / commit responses.
+#[derive(Debug, Clone, Deserialize)]
+pub struct GithubUserStub {
+    pub login: String,
+}
+
+/// Branch ref embedded in a PR response.
+#[derive(Debug, Clone, Deserialize)]
+pub struct GithubRef {
+    #[serde(rename = "ref")]
+    pub ref_: String,
+    pub sha: String,
+}
+
+/// One file's changes in a PR.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GithubPullFile {
+    pub filename: String,
+    pub status: String,
+    pub additions: u64,
+    pub deletions: u64,
+    pub changes: u64,
+    pub raw_url: Option<String>,
+    pub patch: Option<String>,
 }
 
 #[derive(Debug, Clone)]
