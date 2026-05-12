@@ -45,21 +45,23 @@ RUN apt-get update \
        zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
-# Non-root user. UID 1000 matches Railway's default volume-permissions.
+# Non-root user. The container starts as root so the entrypoint can
+# fix volume ownership (Railway mounts /data root-owned), then drops
+# to this user via setpriv before exec'ing the binary.
 RUN useradd --create-home --uid 1000 pankosmia
 
-# Layout under /app: binary + baked assets read by the server.
+# Layout under /app: binary + baked assets + entrypoint.
 COPY --from=build /build/target/release/pankosmia_docker /app/bin/pankosmia_docker
 COPY app_resources /app/app_resources
 COPY catalog /app/catalog
+COPY scripts/entrypoint.sh /app/bin/entrypoint.sh
+RUN chmod +x /app/bin/entrypoint.sh
 
-# The workspace dir is volume-mounted at runtime. Pre-create + chown
-# so the non-root user can write on first boot if no volume is
-# attached (handy for `docker run` smoke tests). On Railway the
-# attached volume takes precedence and inherits its own ownership.
+# Pre-create /data so `docker run` without a volume mount still
+# works for smoke tests.
 RUN mkdir -p /data && chown -R pankosmia:pankosmia /data /app
 
-USER pankosmia
+# Intentionally no `USER` directive — see entrypoint script.
 
 EXPOSE 19119
 
@@ -69,9 +71,8 @@ ENV ROCKET_ADDRESS=0.0.0.0 \
     PANKOSMIA_CATALOG_PATH=/app/catalog/languages.yaml
 
 # `PORT` from the PaaS (Railway, Fly.io, etc.) is bridged to
-# ROCKET_PORT inside main(); if neither is set the server defaults
-# to ROCKET_PORT=19119 via the EXPOSE directive's hint and Rocket's
-# own default.
+# ROCKET_PORT inside main(); the EXPOSE directive's 19119 is the
+# fallback when neither is set.
 
-ENTRYPOINT ["/app/bin/pankosmia_docker"]
+ENTRYPOINT ["/app/bin/entrypoint.sh"]
 CMD ["/data"]
