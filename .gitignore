@@ -27,5 +27,4 @@ build/
 #.idea/
 #
 temp/
-tests/
 test_runtime/
