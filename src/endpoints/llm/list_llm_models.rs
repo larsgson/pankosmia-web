@@ -1,10 +1,10 @@
-use std::path::Path;
 use crate::structs::AppSettings;
+use crate::utils::paths::os_slash_str;
 use crate::utils::response::ok_json_response;
-use rocket::http::{ContentType};
+use rocket::http::ContentType;
 use rocket::response::status;
 use rocket::{get, State};
-use crate::utils::paths::os_slash_str;
+use std::path::Path;
 
 /// *`GET /model`*
 ///
@@ -24,8 +24,7 @@ pub fn list_llm_models(state: &State<AppSettings>) -> status::Custom<(ContentTyp
     );
     let llm_paths = match std::fs::read_dir(llm_models_path) {
         Ok(sp) => sp,
-        Err(_) => return ok_json_response("[]".to_string())
-
+        Err(_) => return ok_json_response("[]".to_string()),
     };
     let mut repos = Vec::new();
     for llm_path_result in llm_paths {
@@ -42,19 +41,11 @@ pub fn list_llm_models(state: &State<AppSettings>) -> status::Custom<(ContentTyp
             println!("Skipping non-dir {}", llm_leaf.to_string_lossy());
             continue;
         }
-        let non_quantized_path = format!(
-            "{}{}model.onnx",
-            &llm_path_string,
-            os_slash_str()
-        );
+        let non_quantized_path = format!("{}{}model.onnx", &llm_path_string, os_slash_str());
         if Path::new(&non_quantized_path).exists() {
             repos.push((format!("{}", &llm_leaf_string), false))
         }
-        let quantized_path = format!(
-            "{}{}model.quant.onnx",
-            &llm_path_string,
-            os_slash_str()
-        );
+        let quantized_path = format!("{}{}model.quant.onnx", &llm_path_string, os_slash_str());
         if Path::new(&quantized_path).exists() {
             repos.push((format!("{}", &llm_leaf_string), true))
         }

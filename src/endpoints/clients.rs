@@ -1,13 +1,13 @@
-use std::collections::BTreeMap;
+use crate::structs::AppSettings;
 use crate::utils::client::{public_serialize_clients, Clients};
+use crate::utils::json_responses::make_bad_json_data_response;
+use crate::utils::paths::os_slash_str;
 use crate::utils::response::{not_ok_json_response, ok_json_response};
 use rocket::http::{ContentType, Status};
 use rocket::response::{status, Redirect};
 use rocket::{get, State};
 use serde_json::{json, Value};
-use crate::structs::AppSettings;
-use crate::utils::json_responses::make_bad_json_data_response;
-use crate::utils::paths::os_slash_str;
+use std::collections::BTreeMap;
 
 /// *`GET /list-clients`*
 ///
@@ -60,8 +60,7 @@ pub fn client_interfaces(clients: &State<Clients>) -> status::Custom<(ContentTyp
                     Status::InternalServerError,
                     make_bad_json_data_response(format!(
                         "Could not load pankosmia metadata as string for {}: {}",
-                        client_path,
-                        e
+                        client_path, e
                     )),
                 )
             }
@@ -74,8 +73,7 @@ pub fn client_interfaces(clients: &State<Clients>) -> status::Custom<(ContentTyp
                     Status::InternalServerError,
                     make_bad_json_data_response(format!(
                         "Could not parse pankosmia metadata as json for {}: {}",
-                        client_path,
-                        e
+                        client_path, e
                     )),
                 )
             }
@@ -97,7 +95,7 @@ pub fn client_interfaces(clients: &State<Clients>) -> status::Custom<(ContentTyp
             "endpoints": endpoints_map
         });
         summaries.insert(id, summary);
-    };
+    }
     ok_json_response(serde_json::to_string(&summaries).unwrap())
 }
 

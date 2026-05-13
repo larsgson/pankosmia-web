@@ -1,5 +1,5 @@
-use crate::structs::{AppSettings, BurritoMetadata, NewBcvResourceBookForm};
 use crate::store::SharedProjectStore;
+use crate::structs::{AppSettings, BurritoMetadata, NewBcvResourceBookForm};
 use crate::utils::burrito::{ingredients_metadata_from_files, ingredients_scopes_from_files};
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_local_path_components, os_slash_str};
@@ -96,16 +96,25 @@ pub async fn new_bcv_resource_book(
         // Find flavor so we can load correct template
         let type_info = metadata_struct.r#type.clone();
         let type_ob = type_info.as_object().expect("Metadata type as object");
-        let flavor_type_ob = type_ob["flavorType"].as_object().expect("flavorType as object");
-        let flavor_ob = flavor_type_ob["flavor"].as_object().expect("Flavor as object");
-        let flavor_string = flavor_ob["name"].as_str().expect("Flavor name as string").to_lowercase();
+        let flavor_type_ob = type_ob["flavorType"]
+            .as_object()
+            .expect("flavorType as object");
+        let flavor_ob = flavor_type_ob["flavor"]
+            .as_object()
+            .expect("Flavor as object");
+        let flavor_string = flavor_ob["name"]
+            .as_str()
+            .expect("Flavor name as string")
+            .to_lowercase();
         let flavor_abbreviation = if flavor_string == "x-bcvnotes" {
             "tn"
         } else if flavor_string == "x-bcvquestions" {
             "tn"
         } else if flavor_string == "x-studyquestions" {
             "sq"
-        } else {"tq"};
+        } else {
+            "tq"
+        };
 
         let path_to_tsv_template = format!(
             "{}{}app_resources{}tsv{}{}.tsv",
@@ -131,7 +140,9 @@ pub async fn new_bcv_resource_book(
             Err(e) => {
                 return not_ok_json_response(
                     Status::BadRequest,
-                    make_bad_json_data_response(format!("could not copy new book from template to repo: {}", e).to_string()),
+                    make_bad_json_data_response(
+                        format!("could not copy new book from template to repo: {}", e).to_string(),
+                    ),
                 )
             }
         }
@@ -193,13 +204,15 @@ pub async fn new_bcv_resource_book(
         }
         // Add ingredient record and currentScope value for TSV
         if let mut ingredients = metadata_struct.ingredients.lock().unwrap() {
-            let new_ingredients = ingredients_metadata_from_files(app_resources_dir.clone(), full_repo_dir.clone());
+            let new_ingredients =
+                ingredients_metadata_from_files(app_resources_dir.clone(), full_repo_dir.clone());
             *ingredients = new_ingredients;
         }
         if let type_info = metadata_struct.r#type {
             let mut type_ob = type_info.as_object().unwrap().clone();
             let flavor_type_ob = type_ob["flavorType"].as_object_mut().unwrap();
-            let new_current_scope = ingredients_scopes_from_files(app_resources_dir, full_repo_dir.clone());
+            let new_current_scope =
+                ingredients_scopes_from_files(app_resources_dir, full_repo_dir.clone());
             flavor_type_ob["currentScope"] =
                 serde_json::from_str(serde_json::to_string(&new_current_scope).unwrap().as_str())
                     .unwrap();

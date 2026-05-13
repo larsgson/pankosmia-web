@@ -1,5 +1,5 @@
+use crate::utils::burrito_api::checks::report_helpers::{ok_check_report, CheckReport};
 use serde_json::Value;
-use crate::utils::burrito_api::checks::report_helpers::{CheckReport, ok_check_report};
 
 pub(crate) fn check_basic_shape(burrito_path: String) -> Vec<CheckReport> {
     // Top-level directory
@@ -52,21 +52,17 @@ pub(crate) fn check_basic_shape(burrito_path: String) -> Vec<CheckReport> {
     }
     match std::fs::read_to_string(metadata_path) {
         Ok(metadata_string) => match serde_json::from_str::<Value>(&metadata_string) {
-            Ok(_) => {
-                reports.push(ok_check_report(
-                    "BurritoShape:Metadata".to_string(),
-                    burrito_path.clone(),
-                ))
-            }
-            Err(e) => {
-                reports.push(CheckReport {
-                    name: "BurritoShape:Metadata:IsJson".to_string(),
-                    path: burrito_path.clone(),
-                    success: false,
-                    comment: Some("Metadata exists but cannot be parsed as JSON".to_string()),
-                    data: Some(vec![e.to_string()]),
-                })
-            }
+            Ok(_) => reports.push(ok_check_report(
+                "BurritoShape:Metadata".to_string(),
+                burrito_path.clone(),
+            )),
+            Err(e) => reports.push(CheckReport {
+                name: "BurritoShape:Metadata:IsJson".to_string(),
+                path: burrito_path.clone(),
+                success: false,
+                comment: Some("Metadata exists but cannot be parsed as JSON".to_string()),
+                data: Some(vec![e.to_string()]),
+            }),
         },
         Err(e) => reports.push(CheckReport {
             name: "BurritoShape:Metadata:IsReadable".to_string(),
@@ -109,9 +105,9 @@ pub(crate) fn check_basic_shape(burrito_path: String) -> Vec<CheckReport> {
                 let entry_string = match wrapped_entry {
                     Ok(entry) => {
                         let v = entry.file_name();
-                        let v2 =  v.to_str().unwrap();
+                        let v2 = v.to_str().unwrap();
                         v2.to_string()
-                    },
+                    }
                     Err(e) => {
                         reports.push(CheckReport {
                             name: "BurritoShape:Content:ContentListable".to_string(),
@@ -123,7 +119,10 @@ pub(crate) fn check_basic_shape(burrito_path: String) -> Vec<CheckReport> {
                         break;
                     }
                 };
-                if entry_string != "metadata.json" && entry_string != "ingredients" && !entry_string.starts_with(".") {
+                if entry_string != "metadata.json"
+                    && entry_string != "ingredients"
+                    && !entry_string.starts_with(".")
+                {
                     unexpected.push(entry_string);
                 }
             }
@@ -136,16 +135,14 @@ pub(crate) fn check_basic_shape(burrito_path: String) -> Vec<CheckReport> {
                     data: Some(unexpected),
                 });
             }
-        },
-        Err(e) => {
-            reports.push(CheckReport {
-                name: "BurritoShape:Ingredients:IsReadable".to_string(),
-                path: burrito_path.clone(),
-                success: false,
-                comment: Some("Ingredients exists but content cannot be listed".to_string()),
-                data: Some(vec![e.to_string()]),
-            })
         }
+        Err(e) => reports.push(CheckReport {
+            name: "BurritoShape:Ingredients:IsReadable".to_string(),
+            path: burrito_path.clone(),
+            success: false,
+            comment: Some("Ingredients exists but content cannot be listed".to_string()),
+            data: Some(vec![e.to_string()]),
+        }),
     }
     reports
 }

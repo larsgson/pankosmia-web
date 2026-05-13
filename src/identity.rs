@@ -85,7 +85,9 @@ impl fmt::Display for RepoId {
 impl<'r> FromParam<'r> for RepoId {
     type Error = ParseError;
     fn from_param(param: &'r str) -> Result<Self, Self::Error> {
-        Uuid::parse_str(param).map(RepoId).map_err(|_| ParseError("not a uuid"))
+        Uuid::parse_str(param)
+            .map(RepoId)
+            .map_err(|_| ParseError("not a uuid"))
     }
 }
 

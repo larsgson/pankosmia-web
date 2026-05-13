@@ -23,15 +23,8 @@ pub async fn list_pending_prs(
     github_client: &State<GithubClient>,
     language: String,
 ) -> status::Custom<(ContentType, String)> {
-    let ctx = match context::resolve(
-        cookies,
-        catalog,
-        app_auth,
-        tokens,
-        github_client,
-        &language,
-    )
-    .await
+    let ctx = match context::resolve(cookies, catalog, app_auth, tokens, github_client, &language)
+        .await
     {
         Ok(c) => c,
         Err(resp) => return resp,

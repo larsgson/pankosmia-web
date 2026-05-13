@@ -19,9 +19,9 @@ pub use blob_store::BlobStore;
 pub use git_workspace::{GitWorkspace, WorkingCopy};
 pub use project_store::{ProjectStore, Tx};
 pub use types::{
-    AppState, AuthRequest, Bcv, BlobKey, BurritoMetadata, IngredientSummary,
-    LanguageMembership, NewProject, NewRepo, ProjectSummary, RepoRecord, Role, StoreError,
-    StoreResult, TempId, TempUploadHandle, Typography, UserSettings,
+    AppState, AuthRequest, Bcv, BlobKey, BurritoMetadata, IngredientSummary, LanguageMembership,
+    NewProject, NewRepo, ProjectSummary, RepoRecord, Role, StoreError, StoreResult, TempId,
+    TempUploadHandle, Typography, UserSettings,
 };
 
 /// Trait-object form of `ProjectStore` that Rocket manages as state.

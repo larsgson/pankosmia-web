@@ -189,7 +189,7 @@ pub(crate) fn add_app_settings(
     user_settings_json: &Value,
     app_state_json: &Value,
     product_json: &Value,
-    client_config: BTreeMap<String, Vec<ClientConfigSection>>
+    client_config: BTreeMap<String, Vec<ClientConfigSection>>,
 ) -> Rocket<Build> {
     rocket_instance.manage(AppSettings {
         repo_dir: Mutex::new(repo_dir_path.clone()),

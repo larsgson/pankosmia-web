@@ -69,8 +69,9 @@ pub async fn post_delete_ingredients(
         .await;
     }
     let path_components: Components<'_> = repo_path.components();
-    let full_repo_path =
-        store.workspace_root().to_string_lossy().into_owned() + os_slash_str() + &repo_path.display().to_string();
+    let full_repo_path = store.workspace_root().to_string_lossy().into_owned()
+        + os_slash_str()
+        + &repo_path.display().to_string();
     if check_path_components(&mut path_components.clone())
         && check_path_string_components(ipath.clone())
         && std::fs::metadata(&full_repo_path).is_ok()
@@ -84,12 +85,10 @@ pub async fn post_delete_ingredients(
         }
         match std::fs::remove_dir_all(&destination) {
             Ok(_) => ok_ok_json_response(),
-            Err(e) => {
-                not_ok_json_response(
-                    Status::InternalServerError,
-                    make_bad_json_data_response(format!("Could not delete directory: {}", e)),
-                )
-            }
+            Err(e) => not_ok_json_response(
+                Status::InternalServerError,
+                make_bad_json_data_response(format!("Could not delete directory: {}", e)),
+            ),
         }
     } else {
         not_ok_bad_repo_json_response()

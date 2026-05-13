@@ -1,5 +1,5 @@
-use crate::structs::AppSettings;
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, os_slash_str};
 use crate::utils::response::{

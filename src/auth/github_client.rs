@@ -191,7 +191,12 @@ impl GithubClient {
             .post(format!("{}/repos/{}/pulls", GITHUB_API, upstream))
             .bearer_auth(token)
             .header("Accept", "application/vnd.github+json")
-            .json(&Body { title, head, base, body })
+            .json(&Body {
+                title,
+                head,
+                base,
+                body,
+            })
             .send()
             .await
             .map_err(|e| GithubError::Network(e.to_string()))?;
@@ -354,7 +359,6 @@ impl GithubClient {
             .await
             .map_err(|e| GithubError::Decode(e.to_string()))
     }
-
 }
 
 // --- Git Data / Contents API write helpers (App-flow) --------------
@@ -695,10 +699,9 @@ impl GithubClient {
             .get("truncated")
             .and_then(|t| t.as_bool())
             .unwrap_or(false);
-        let entries: Vec<GithubTreeEntry> = serde_json::from_value(
-            v.get("tree").cloned().unwrap_or(serde_json::json!([])),
-        )
-        .map_err(|e| GithubError::Decode(e.to_string()))?;
+        let entries: Vec<GithubTreeEntry> =
+            serde_json::from_value(v.get("tree").cloned().unwrap_or(serde_json::json!([])))
+                .map_err(|e| GithubError::Decode(e.to_string()))?;
         Ok((entries, truncated))
     }
 

@@ -76,9 +76,14 @@ pub async fn log_repo(
             .map_err(|e| format!("revparse: {}", e))?;
         if rev_spec.mode().contains(git2::RevparseMode::SINGLE) {
             let from = rev_spec.from().ok_or_else(|| "no rev from".to_string())?;
-            revwalk.push(from.id()).map_err(|e| format!("push: {}", e))?;
+            revwalk
+                .push(from.id())
+                .map_err(|e| format!("push: {}", e))?;
         } else {
-            let from = rev_spec.from().ok_or_else(|| "no rev from".to_string())?.id();
+            let from = rev_spec
+                .from()
+                .ok_or_else(|| "no rev from".to_string())?
+                .id();
             let to = rev_spec.to().ok_or_else(|| "no rev to".to_string())?.id();
             revwalk.push(to).map_err(|e| format!("push to: {}", e))?;
             if rev_spec.mode().contains(git2::RevparseMode::MERGE_BASE) {
@@ -88,7 +93,9 @@ pub async fn log_repo(
                 let o = repo
                     .find_object(base, Some(ObjectType::Commit))
                     .map_err(|e| format!("find_object: {}", e))?;
-                revwalk.push(o.id()).map_err(|e| format!("push base: {}", e))?;
+                revwalk
+                    .push(o.id())
+                    .map_err(|e| format!("push base: {}", e))?;
             }
             revwalk.hide(from).map_err(|e| format!("hide: {}", e))?;
         }

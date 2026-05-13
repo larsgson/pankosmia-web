@@ -62,15 +62,9 @@ impl GitHubLanguageStore {
     /// Lazy-clone or fetch the language repo's local cache. Public
     /// for use by the catalog refresh task (G2 integration) and by
     /// the language webhook receiver (G5).
-    pub async fn ensure_language_clone(
-        &self,
-        lang: &LanguageCode,
-    ) -> StoreResult<PathBuf> {
+    pub async fn ensure_language_clone(&self, lang: &LanguageCode) -> StoreResult<PathBuf> {
         let lang_dir = self.language_clone_root(lang);
-        let entry = self
-            .registry
-            .get(lang)
-            .ok_or(StoreError::NotFound)?;
+        let entry = self.registry.get(lang).ok_or(StoreError::NotFound)?;
         let url = entry.upstream_clone_url();
         // Run git2 ops on a blocking thread; this method is a
         // surface for the integration glue, not a hot path.
@@ -95,17 +89,17 @@ impl GitHubLanguageStore {
 }
 
 fn nyi(method: &'static str) -> StoreError {
-    StoreError::Backend(format!("GitHubLanguageStore::{}: not implemented yet (G4+)", method))
+    StoreError::Backend(format!(
+        "GitHubLanguageStore::{}: not implemented yet (G4+)",
+        method
+    ))
 }
 
 #[async_trait]
 impl ProjectStore for GitHubLanguageStore {
     // --- identity & membership ------------------------------------
 
-    async fn list_user_languages(
-        &self,
-        _user: UserId,
-    ) -> StoreResult<Vec<ProjectSummary>> {
+    async fn list_user_languages(&self, _user: UserId) -> StoreResult<Vec<ProjectSummary>> {
         // For G3: every registered language is visible to every
         // user as `Viewer`. Real role lookup arrives in G6 via the
         // GitHub collaborators API.
@@ -121,11 +115,7 @@ impl ProjectStore for GitHubLanguageStore {
             .collect())
     }
 
-    async fn project_role(
-        &self,
-        _user: UserId,
-        lang: LanguageCode,
-    ) -> StoreResult<Option<Role>> {
+    async fn project_role(&self, _user: UserId, lang: LanguageCode) -> StoreResult<Option<Role>> {
         // Default: Viewer for any registered language. Real role
         // lookup (calling GitHub collaborators API per user) lands
         // in G6.
@@ -136,11 +126,7 @@ impl ProjectStore for GitHubLanguageStore {
         }
     }
 
-    async fn create_project(
-        &self,
-        _owner: UserId,
-        _spec: NewProject,
-    ) -> StoreResult<()> {
+    async fn create_project(&self, _owner: UserId, _spec: NewProject) -> StoreResult<()> {
         Err(StoreError::Backend(
             "register a new language by opening a PR on the catalog repo \
              (https://github.com/<org>/catalog), not via this endpoint"
@@ -148,12 +134,7 @@ impl ProjectStore for GitHubLanguageStore {
         ))
     }
 
-    async fn add_member(
-        &self,
-        _lang: LanguageCode,
-        _user: UserId,
-        _role: Role,
-    ) -> StoreResult<()> {
+    async fn add_member(&self, _lang: LanguageCode, _user: UserId, _role: Role) -> StoreResult<()> {
         Err(StoreError::Backend(
             "membership is managed via GitHub repo collaborators on the language repo, \
              not via this endpoint"
@@ -161,11 +142,7 @@ impl ProjectStore for GitHubLanguageStore {
         ))
     }
 
-    async fn remove_member(
-        &self,
-        _lang: LanguageCode,
-        _user: UserId,
-    ) -> StoreResult<()> {
+    async fn remove_member(&self, _lang: LanguageCode, _user: UserId) -> StoreResult<()> {
         Err(StoreError::Backend(
             "membership is managed via GitHub repo collaborators on the language repo, \
              not via this endpoint"
@@ -183,22 +160,14 @@ impl ProjectStore for GitHubLanguageStore {
     async fn get_user_settings(&self, _user: UserId) -> StoreResult<UserSettings> {
         Err(StoreError::NotFound)
     }
-    async fn put_user_settings(
-        &self,
-        _user: UserId,
-        _s: UserSettings,
-    ) -> StoreResult<()> {
+    async fn put_user_settings(&self, _user: UserId, _s: UserSettings) -> StoreResult<()> {
         // Accept silently — clients should be using localStorage.
         Ok(())
     }
     async fn get_languages(&self, _user: UserId) -> StoreResult<Vec<LanguageCode>> {
         Ok(Vec::new())
     }
-    async fn put_languages(
-        &self,
-        _user: UserId,
-        _langs: Vec<LanguageCode>,
-    ) -> StoreResult<()> {
+    async fn put_languages(&self, _user: UserId, _langs: Vec<LanguageCode>) -> StoreResult<()> {
         Ok(())
     }
     async fn get_typography(&self, _user: UserId) -> StoreResult<Typography> {
@@ -215,26 +184,13 @@ impl ProjectStore for GitHubLanguageStore {
     async fn get_app_state(&self, _lang: LanguageCode) -> StoreResult<AppState> {
         Ok(AppState { bcv: default_bcv() })
     }
-    async fn put_app_state(
-        &self,
-        _lang: LanguageCode,
-        _s: AppState,
-    ) -> StoreResult<()> {
+    async fn put_app_state(&self, _lang: LanguageCode, _s: AppState) -> StoreResult<()> {
         Ok(())
     }
-    async fn get_bcv(
-        &self,
-        _lang: LanguageCode,
-        _user: UserId,
-    ) -> StoreResult<Bcv> {
+    async fn get_bcv(&self, _lang: LanguageCode, _user: UserId) -> StoreResult<Bcv> {
         Ok(default_bcv())
     }
-    async fn put_bcv(
-        &self,
-        _lang: LanguageCode,
-        _user: UserId,
-        _bcv: Bcv,
-    ) -> StoreResult<()> {
+    async fn put_bcv(&self, _lang: LanguageCode, _user: UserId, _bcv: Bcv) -> StoreResult<()> {
         Ok(())
     }
 
@@ -242,19 +198,10 @@ impl ProjectStore for GitHubLanguageStore {
     //
     // Desktop-only feature; not used on hosted. Empty.
 
-    async fn get_auth_token(
-        &self,
-        _user: UserId,
-        _key: &str,
-    ) -> StoreResult<Option<String>> {
+    async fn get_auth_token(&self, _user: UserId, _key: &str) -> StoreResult<Option<String>> {
         Ok(None)
     }
-    async fn put_auth_token(
-        &self,
-        _user: UserId,
-        _key: &str,
-        _code: &str,
-    ) -> StoreResult<()> {
+    async fn put_auth_token(&self, _user: UserId, _key: &str, _code: &str) -> StoreResult<()> {
         Ok(())
     }
     async fn delete_auth_token(&self, _user: UserId, _key: &str) -> StoreResult<()> {
@@ -283,19 +230,13 @@ impl ProjectStore for GitHubLanguageStore {
     // RepoId is derived from the language code so it's stable.
 
     async fn list_repos(&self, lang: LanguageCode) -> StoreResult<Vec<RepoRecord>> {
-        let entry = self
-            .registry
-            .get(&lang)
-            .ok_or(StoreError::NotFound)?;
+        let entry = self.registry.get(&lang).ok_or(StoreError::NotFound)?;
         let working_path = self
             .language_clone_root(&lang)
             .to_string_lossy()
             .into_owned();
         let id_namespace = uuid::Uuid::from_u128(0xa1b2c3d4_e5f6_7890_1234_567890abcdef_u128);
-        let repo_id = RepoId(uuid::Uuid::new_v5(
-            &id_namespace,
-            entry.repo.as_bytes(),
-        ));
+        let repo_id = RepoId(uuid::Uuid::new_v5(&id_namespace, entry.repo.as_bytes()));
         Ok(vec![RepoRecord {
             id: repo_id,
             name: entry.repo.clone(),
@@ -304,25 +245,13 @@ impl ProjectStore for GitHubLanguageStore {
         }])
     }
 
-    async fn register_repo(
-        &self,
-        _lang: LanguageCode,
-        _r: NewRepo,
-    ) -> StoreResult<RepoId> {
+    async fn register_repo(&self, _lang: LanguageCode, _r: NewRepo) -> StoreResult<RepoId> {
         Err(nyi("register_repo (use catalog repo PR)"))
     }
-    async fn unregister_repo(
-        &self,
-        _lang: LanguageCode,
-        _repo: RepoId,
-    ) -> StoreResult<()> {
+    async fn unregister_repo(&self, _lang: LanguageCode, _repo: RepoId) -> StoreResult<()> {
         Err(nyi("unregister_repo (use catalog repo PR)"))
     }
-    async fn lookup_repo(
-        &self,
-        lang: LanguageCode,
-        repo: RepoId,
-    ) -> StoreResult<RepoRecord> {
+    async fn lookup_repo(&self, lang: LanguageCode, repo: RepoId) -> StoreResult<RepoRecord> {
         let all = self.list_repos(lang).await?;
         all.into_iter()
             .find(|r| r.id == repo)
@@ -364,7 +293,10 @@ impl ProjectStore for GitHubLanguageStore {
         if !dir.exists() {
             return Ok(out);
         }
-        for entry in walkdir::WalkDir::new(&dir).into_iter().filter_map(|e| e.ok()) {
+        for entry in walkdir::WalkDir::new(&dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -395,10 +327,7 @@ impl ProjectStore for GitHubLanguageStore {
     // strings. We honor them by joining the workspace root + path
     // exactly as the FS impl does.
 
-    async fn repo_workspace_path(
-        &self,
-        repo_path: &Path,
-    ) -> StoreResult<PathBuf> {
+    async fn repo_workspace_path(&self, repo_path: &Path) -> StoreResult<PathBuf> {
         paths::legacy_repo_workspace_path(&self.workspace_root, repo_path)
     }
 
@@ -415,9 +344,7 @@ impl ProjectStore for GitHubLanguageStore {
     async fn with_tx<'a>(
         &'a self,
         f: Box<
-            dyn for<'t> FnOnce(&'t mut (dyn Tx + 'a)) -> BoxFuture<'t, StoreResult<()>>
-                + Send
-                + 'a,
+            dyn for<'t> FnOnce(&'t mut (dyn Tx + 'a)) -> BoxFuture<'t, StoreResult<()>> + Send + 'a,
         >,
     ) -> StoreResult<()> {
         // Like the FS impl: no real transactions. Future Phase-3
@@ -434,11 +361,7 @@ struct GitHubTx {
 
 #[async_trait]
 impl Tx for GitHubTx {
-    async fn put_app_state(
-        &mut self,
-        _lang: LanguageCode,
-        _s: AppState,
-    ) -> StoreResult<()> {
+    async fn put_app_state(&mut self, _lang: LanguageCode, _s: AppState) -> StoreResult<()> {
         Ok(())
     }
     async fn put_burrito_metadata(

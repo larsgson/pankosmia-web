@@ -23,26 +23,15 @@ pub async fn reject_pr(
     pr: u64,
     reason: Option<String>,
 ) -> status::Custom<(ContentType, String)> {
-    let ctx = match context::resolve(
-        cookies,
-        catalog,
-        app_auth,
-        tokens,
-        github_client,
-        &language,
-    )
-    .await
+    let ctx = match context::resolve(cookies, catalog, app_auth, tokens, github_client, &language)
+        .await
     {
         Ok(c) => c,
         Err(resp) => return resp,
     };
     if let Some(reason_text) = reason.as_ref() {
         if !reason_text.is_empty() {
-            let comment = format!(
-                "Rejected by @{}:\n\n{}",
-                ctx.login,
-                reason_text
-            );
+            let comment = format!("Rejected by @{}:\n\n{}", ctx.login, reason_text);
             if let Err(e) = github_client
                 .add_pr_comment(&ctx.installation_token, &ctx.upstream, pr, &comment)
                 .await

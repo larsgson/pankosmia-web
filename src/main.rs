@@ -1,6 +1,6 @@
-use std::env;
-use serde_json::json;
 use rocket::fs::relative;
+use serde_json::json;
+use std::env;
 
 #[rocket::main]
 pub async fn main() -> Result<(), rocket::Error> {

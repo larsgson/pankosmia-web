@@ -1,8 +1,8 @@
 use crate::static_vars::NET_IS_ENABLED;
-use crate::utils::json_responses::{make_net_status_response};
+use crate::utils::json_responses::make_net_status_response;
 use crate::utils::response::{ok_json_response, ok_ok_json_response};
 use crate::MsgQueue;
-use rocket::http::{ContentType};
+use rocket::http::ContentType;
 use rocket::response::status;
 use rocket::{get, post, State};
 use std::sync::atomic::Ordering;

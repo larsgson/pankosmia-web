@@ -13,7 +13,7 @@
 //!
 //! Disable by setting `PANKOSMIA_PERIODIC_FETCH_INTERVAL_SECS=0`.
 
-use crate::catalog::CatalogRegistry;
+use crate::catalog::{CatalogRegistry, SharedCatalogSync};
 use crate::store::SharedProjectStore;
 use std::sync::Arc;
 use std::time::Duration;
@@ -45,13 +45,11 @@ pub fn interval_from_env() -> Option<Duration> {
 /// this version (process exit drops it).
 pub fn spawn(
     catalog: Arc<CatalogRegistry>,
+    catalog_sync: SharedCatalogSync,
     store: SharedProjectStore,
     interval: Duration,
 ) {
-    println!(
-        "periodic_fetch: running every {}s",
-        interval.as_secs()
-    );
+    println!("periodic_fetch: running every {}s", interval.as_secs());
     tokio::spawn(async move {
         tokio::time::sleep(STARTUP_JITTER).await;
         let mut ticker = tokio::time::interval(interval);
@@ -61,6 +59,17 @@ pub fn spawn(
         ticker.tick().await;
         loop {
             ticker.tick().await;
+            // Catalog refresh (cheap when not git-backed; a `git
+            // fetch` + reset otherwise). Run synchronously inside
+            // a blocking task because git2 + file IO are blocking.
+            let catalog_for_sync = catalog.clone();
+            let sync_clone = catalog_sync.clone();
+            let _ = tokio::task::spawn_blocking(move || {
+                if let Err(e) = sync_clone.refresh(&catalog_for_sync) {
+                    eprintln!("periodic_fetch: catalog refresh failed: {}", e);
+                }
+            })
+            .await;
             let languages = catalog.list();
             if languages.is_empty() {
                 continue;

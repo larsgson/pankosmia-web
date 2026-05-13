@@ -49,10 +49,7 @@ pub enum AudioRefError {
     #[error("missing required field: {0}")]
     MissingField(&'static str),
     #[error("invalid {field}: {reason}")]
-    BadField {
-        field: &'static str,
-        reason: String,
-    },
+    BadField { field: &'static str, reason: String },
     #[error("license '{0}' not in allowed-licenses list")]
     DisallowedLicense(String),
     #[error("URL host '{0}' not in PANKOSMIA_AUDIO_URL_HOSTS_ALLOWLIST")]
@@ -61,7 +58,9 @@ pub enum AudioRefError {
     UrlNotAudio,
     #[error("schema_version {0} not supported")]
     UnsupportedSchemaVersion(u32),
-    #[error("either `url` / `type` / `license` (flat shape) OR `takes` (multi-take shape) required")]
+    #[error(
+        "either `url` / `type` / `license` (flat shape) OR `takes` (multi-take shape) required"
+    )]
     NeitherShape,
     #[error("`main_take_index` out of range for `takes` length")]
     MainTakeOutOfRange,
@@ -166,8 +165,8 @@ struct RefV1Take {
 /// network HEAD check — call `head_validate_url` separately when
 /// `cfg.validate_urls` is true.
 pub fn validate_schema(bytes: &[u8], cfg: &AudioRefConfig) -> Result<(), AudioRefError> {
-    let parsed: RefV1Raw = serde_json::from_slice(bytes)
-        .map_err(|e| AudioRefError::BadJson(e.to_string()))?;
+    let parsed: RefV1Raw =
+        serde_json::from_slice(bytes).map_err(|e| AudioRefError::BadJson(e.to_string()))?;
 
     let version = parsed.schema_version.unwrap_or(1);
     if version != 1 {
@@ -260,10 +259,7 @@ fn validate_license(license: &str, cfg: &AudioRefConfig) -> Result<(), AudioRefE
 fn validate_host(url: &str, cfg: &AudioRefConfig) -> Result<(), AudioRefError> {
     // Pull host out of the URL crudely; no full RFC 3986 parser
     // needed here.
-    let after_scheme = url
-        .split_once("://")
-        .map(|(_, rest)| rest)
-        .unwrap_or(url);
+    let after_scheme = url.split_once("://").map(|(_, rest)| rest).unwrap_or(url);
     let host_and_after = after_scheme.split('/').next().unwrap_or("");
     let host = host_and_after.split(':').next().unwrap_or("");
     if cfg
@@ -371,7 +367,8 @@ mod tests {
 
     #[test]
     fn rejects_bad_url_scheme() {
-        let body = br#"{"schema_version":1,"url":"ftp://x/y.mp3","type":"audio/mp3","license":"CC0-1.0"}"#;
+        let body =
+            br#"{"schema_version":1,"url":"ftp://x/y.mp3","type":"audio/mp3","license":"CC0-1.0"}"#;
         let err = validate_schema(body, &default_cfg()).unwrap_err();
         assert!(matches!(err, AudioRefError::BadField { field: "url", .. }));
     }

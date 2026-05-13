@@ -1,25 +1,25 @@
-use crate::structs::AppSettings;
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
+use crate::utils::files::load_json;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::os_slash_str;
 use crate::utils::response::{not_ok_json_response, ok_ok_json_response};
+use crate::utils::time::utc_now_timestamp_string;
+use copy_dir::copy_dir;
 use git2::{Repository, RepositoryInitOptions};
 use rocket::http::{ContentType, Status};
 use rocket::response::status;
 use rocket::serde::json::Json;
-use rocket::{post, FromForm, State};
-use copy_dir::copy_dir;
 use rocket::serde::Deserialize;
+use rocket::{post, FromForm, State};
 use serde_json::json;
-use crate::utils::files::load_json;
-use crate::utils::time::utc_now_timestamp_string;
 
 #[derive(FromForm, Deserialize)]
 pub struct NewObsContentForm {
     pub content_name: String,
     pub content_abbr: String,
     pub content_language_code: String,
-    pub branch_name: Option<String>
+    pub branch_name: Option<String>,
 }
 
 /// *`POST /new-obs-resource`*
@@ -158,17 +158,13 @@ pub fn new_obs_resource_repo(
             )
         }
     };
-    let path_to_repo_gitignore =
-        format!("{}{}.gitignore", path_to_new_repo, os_slash_str(),);
+    let path_to_repo_gitignore = format!("{}{}.gitignore", path_to_new_repo, os_slash_str(),);
     match std::fs::write(path_to_repo_gitignore, &gitignore_string) {
         Ok(_) => (),
         Err(e) => {
             return not_ok_json_response(
                 Status::InternalServerError,
-                make_bad_json_data_response(format!(
-                    "Could not write gitignore to repo: {}",
-                    e
-                )),
+                make_bad_json_data_response(format!("Could not write gitignore to repo: {}", e)),
             )
         }
     }
@@ -197,12 +193,12 @@ pub fn new_obs_resource_repo(
 
     let language_tag = match language_lookup_json[&json_form.content_language_code].as_object() {
         Some(_) => json_form.content_language_code.clone(),
-        None => format!("x-{}", &json_form.content_language_code)
+        None => format!("x-{}", &json_form.content_language_code),
     };
 
     let language_name = match language_lookup_json[&json_form.content_language_code].as_object() {
         Some(r) => r["en"].as_str().expect("English language name").to_string(),
-        None => json_form.content_language_code.clone()
+        None => json_form.content_language_code.clone(),
     };
 
     // Read and customize metadata

@@ -10,9 +10,7 @@
 use pankosmia_docker::identity::{LanguageCode, UserId};
 use pankosmia_docker::store::fs::FsLanguageStore;
 use pankosmia_docker::store::project_store::ProjectStore;
-use pankosmia_docker::store::types::{
-    AppState, AuthRequest, Bcv, NewProject, NewRepo, Role,
-};
+use pankosmia_docker::store::types::{AppState, AuthRequest, Bcv, NewProject, NewRepo, Role};
 use pankosmia_docker::structs::Typography;
 use std::collections::BTreeMap;
 use tempfile::TempDir;
@@ -76,7 +74,10 @@ async fn fs_user_settings_round_trip() {
         features: BTreeMap::new(),
     };
 
-    store.put_typography(alice(), typography.clone()).await.unwrap();
+    store
+        .put_typography(alice(), typography.clone())
+        .await
+        .unwrap();
     let got = store.get_typography(alice()).await.unwrap();
     assert_eq!(got.font_set, "noto");
     assert_eq!(got.size, "16");
@@ -108,10 +109,7 @@ async fn fs_app_state_and_bcv_round_trip() {
         chapter: 2,
         verse: 5,
     };
-    store
-        .put_bcv(fr(), alice(), new_bcv.clone())
-        .await
-        .unwrap();
+    store.put_bcv(fr(), alice(), new_bcv.clone()).await.unwrap();
     let got = store.get_bcv(fr(), alice()).await.unwrap();
     assert_eq!(got.book_code, "JAS");
     assert_eq!(got.chapter, 2);
@@ -169,10 +167,7 @@ async fn fs_auth_request_take_is_one_shot() {
         .await
         .unwrap();
 
-    let taken = store
-        .take_auth_request(alice(), "door43")
-        .await
-        .unwrap();
+    let taken = store.take_auth_request(alice(), "door43").await.unwrap();
     assert!(taken.is_some());
 
     // Second take returns None.

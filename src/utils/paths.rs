@@ -1,6 +1,6 @@
-use std::env;
-use std::path::{Components};
 use home::home_dir;
+use std::env;
+use std::path::Components;
 
 pub(crate) fn os_slash_str() -> &'static str {
     match env::consts::OS {
@@ -140,23 +140,23 @@ pub(crate) fn home_dir_string() -> String {
         .to_string()
 }
 
-pub(crate) fn app_setup_path (working_dir: &String) -> String {
+pub(crate) fn app_setup_path(working_dir: &String) -> String {
     format!("{}/app_setup.json", working_dir)
 }
 
-pub(crate) fn source_local_setup_path (app_resources_dir: &String) -> String {
+pub(crate) fn source_local_setup_path(app_resources_dir: &String) -> String {
     format!("{}/setup/local_setup.json", app_resources_dir)
 }
 
-pub(crate) fn app_state_path (working_dir: &String) -> String {
+pub(crate) fn app_state_path(working_dir: &String) -> String {
     format!("{}/app_state.json", working_dir)
 }
 
-pub(crate) fn user_settings_path (working_dir: &String) -> String {
+pub(crate) fn user_settings_path(working_dir: &String) -> String {
     format!("{}/user_settings.json", working_dir)
 }
 
-pub(crate) fn webfonts_path (working_dir: &String) -> String {
+pub(crate) fn webfonts_path(working_dir: &String) -> String {
     format!("{}/webfonts", working_dir)
 }
 

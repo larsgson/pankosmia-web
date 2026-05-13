@@ -157,7 +157,13 @@ impl GithubEditFlow {
 
         let head_query = format!("{}:{}", owner, working_branch);
         let existing_pr: Option<GithubPullRequest> = github_client
-            .list_pulls(&token, &upstream, Some(&head_query), Some(&base_branch), "open")
+            .list_pulls(
+                &token,
+                &upstream,
+                Some(&head_query),
+                Some(&base_branch),
+                "open",
+            )
             .await?
             .into_iter()
             .next();
@@ -185,8 +191,10 @@ impl GithubEditFlow {
             }
         }
 
-        let coauthor_email =
-            format!("{}+{}@{}", github_user_id, login, COMMIT_AUTHOR_EMAIL_DOMAIN);
+        let coauthor_email = format!(
+            "{}+{}@{}",
+            github_user_id, login, COMMIT_AUTHOR_EMAIL_DOMAIN
+        );
         let full_message = format!(
             "{}\n\nCo-authored-by: {} <{}>",
             commit_message, login, coauthor_email
@@ -336,14 +344,7 @@ impl GithubEditFlow {
                 login, working_branch
             );
             github_client
-                .open_pull_request(
-                    &token,
-                    &upstream,
-                    &title,
-                    &head_query,
-                    &base_branch,
-                    &body,
-                )
+                .open_pull_request(&token, &upstream, &title, &head_query, &base_branch, &body)
                 .await?
         };
         Ok(SaveOutcome {

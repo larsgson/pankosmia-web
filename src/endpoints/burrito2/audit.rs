@@ -1,5 +1,5 @@
-use crate::structs::AppSettings;
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::utils::burrito_api::checks::basic_shape::check_basic_shape;
 use crate::utils::burrito_api::checks::metadata_validation::check_metadata_validation;
 use crate::utils::paths::{check_path_components, os_slash_str};

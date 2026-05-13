@@ -1,5 +1,5 @@
-use boon::{Compiler, Schemas};
 use crate::utils::burrito_api::checks::report_helpers::{ok_check_report, CheckReport};
+use boon::{Compiler, Schemas};
 
 // Run basic_shape checks first
 pub(crate) fn check_metadata_validation(burrito_path: String) -> Vec<CheckReport> {
@@ -11,7 +11,9 @@ pub(crate) fn check_metadata_validation(burrito_path: String) -> Vec<CheckReport
     let schema_path_str = schema_path.to_str().unwrap();
     let mut schemas = Schemas::new();
     let mut compiler = Compiler::new();
-    let sch_index = compiler.compile(schema_path_str, &mut schemas).expect("Cannot comple schema");
+    let sch_index = compiler
+        .compile(schema_path_str, &mut schemas)
+        .expect("Cannot comple schema");
     let metadata_path = format!("{}/metadata.json", burrito_path);
     let metadata_string = std::fs::read_to_string(&metadata_path)
         .expect(format!("Unable to read metadata from {}", metadata_path).as_str());
@@ -22,15 +24,13 @@ pub(crate) fn check_metadata_validation(burrito_path: String) -> Vec<CheckReport
             burrito_path.clone(),
         )),
         Err(errors) => {
-            reports.push(
-                CheckReport {
-                    name: "Metadata:Validation:Validates".to_string(),
-                    path: burrito_path.clone(),
-                    success: false,
-                    comment: Some("Metadata is not schema valid".to_string()),
-                    data: Some(vec!(format!("{}", errors.detailed_output()))),
-                }
-            );
+            reports.push(CheckReport {
+                name: "Metadata:Validation:Validates".to_string(),
+                path: burrito_path.clone(),
+                success: false,
+                comment: Some("Metadata is not schema valid".to_string()),
+                data: Some(vec![format!("{}", errors.detailed_output())]),
+            });
         }
     }
 

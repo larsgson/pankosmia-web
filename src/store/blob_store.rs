@@ -31,22 +31,13 @@ pub trait BlobStore: Send + Sync {
     // small ingredient text. Anything user-supplied (audio, video,
     // zips) MUST go through the streaming variants.
 
-    async fn put_blob(
-        &self,
-        lang: LanguageCode,
-        key: BlobKey,
-        bytes: Bytes,
-    ) -> StoreResult<()>;
+    async fn put_blob(&self, lang: LanguageCode, key: BlobKey, bytes: Bytes) -> StoreResult<()>;
     async fn get_blob(&self, lang: LanguageCode, key: BlobKey) -> StoreResult<Bytes>;
     async fn delete_blob(&self, lang: LanguageCode, key: BlobKey) -> StoreResult<()>;
 
     // --- streaming methods ----------------------------------------
 
-    async fn get_blob_stream(
-        &self,
-        lang: LanguageCode,
-        key: BlobKey,
-    ) -> StoreResult<ByteStream>;
+    async fn get_blob_stream(&self, lang: LanguageCode, key: BlobKey) -> StoreResult<ByteStream>;
 
     // --- temp-upload flow -----------------------------------------
     //
@@ -54,10 +45,7 @@ pub trait BlobStore: Send + Sync {
     // Phase 2: server issues a presigned PUT URL; the browser uploads
     // direct, then calls back to finalize.
 
-    async fn put_temp(
-        &self,
-        user: UserId,
-    ) -> StoreResult<(TempId, TempUploadHandle)>;
+    async fn put_temp(&self, user: UserId) -> StoreResult<(TempId, TempUploadHandle)>;
 
     async fn take_temp(&self, user: UserId, id: TempId) -> StoreResult<Bytes>;
 }

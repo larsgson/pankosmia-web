@@ -82,20 +82,33 @@ pub async fn post_raw_ingredient(
             rate_limiter,
             audio_ref_cfg,
             language_header,
-            SaveOp::Put { ipath: &ipath, bytes: &bytes },
+            SaveOp::Put {
+                ipath: &ipath,
+                bytes: &bytes,
+            },
             &commit_message,
         )
         .await;
     }
     let path_components: Components<'_> = repo_path.components();
     let repo_dir = state.repo_dir.lock().expect("lock for repo dir");
-    let full_repo_path =
-        format!("{}{}{}", &repo_dir, os_slash_str(), &repo_path.display().to_string());
+    let full_repo_path = format!(
+        "{}{}{}",
+        &repo_dir,
+        os_slash_str(),
+        &repo_path.display().to_string()
+    );
     if check_path_components(&mut path_components.clone())
         && check_path_string_components(ipath.clone())
         && std::fs::metadata(&full_repo_path).is_ok()
     {
-        let destination = format!("{}{}ingredients{}{}", &full_repo_path, os_slash_str(), os_slash_str(), &ipath);
+        let destination = format!(
+            "{}{}ingredients{}{}",
+            &full_repo_path,
+            os_slash_str(),
+            os_slash_str(),
+            &ipath
+        );
         let destination_parent = destination_parent(destination.clone());
         // Make subdirs if necessary
         if !std::path::Path::new(&destination_parent).exists() {
@@ -121,27 +134,29 @@ pub async fn post_raw_ingredient(
                     Err(e) => {
                         return not_ok_json_response(
                             Status::InternalServerError,
-                            make_bad_json_data_response(format!("Could not write backup file: {}", e)),
+                            make_bad_json_data_response(format!(
+                                "Could not write backup file: {}",
+                                e
+                            )),
                         )
                     }
                 }
             }
         }
         match std::fs::write(destination, json_form["payload"].as_str().unwrap()) {
-            Ok(_) => {},
-            Err(e) => return not_ok_json_response(
-                Status::InternalServerError,
-                make_bad_json_data_response(format!("Could not write to {}: {}", ipath, e)),
-            ),
+            Ok(_) => {}
+            Err(e) => {
+                return not_ok_json_response(
+                    Status::InternalServerError,
+                    make_bad_json_data_response(format!("Could not write to {}: {}", ipath, e)),
+                )
+            }
         };
         if update_ingredients.is_some() {
             // Get metadata as struct
             let app_resources_dir = format!("{}", &state.app_resources_dir);
-            let path_to_repo_metadata = format!(
-                "{}{}metadata.json",
-                &full_repo_path,
-                os_slash_str(),
-            );
+            let path_to_repo_metadata =
+                format!("{}{}metadata.json", &full_repo_path, os_slash_str(),);
             let metadata_string = match std::fs::read_to_string(&path_to_repo_metadata) {
                 Ok(v) => v,
                 Err(e) => {
@@ -155,7 +170,8 @@ pub async fn post_raw_ingredient(
                 }
             };
             // Make struct from metadata
-            let mut metadata_struct: BurritoMetadata = match serde_json::from_str(&metadata_string) {
+            let mut metadata_struct: BurritoMetadata = match serde_json::from_str(&metadata_string)
+            {
                 Ok(v) => v,
                 Err(e) => {
                     return not_ok_json_response(
@@ -166,15 +182,24 @@ pub async fn post_raw_ingredient(
             };
             // Add ingredient record and currentScope value for USFM
             if let mut ingredients = metadata_struct.ingredients.lock().unwrap() {
-                let new_ingredients = ingredients_metadata_from_files(app_resources_dir.clone(), full_repo_path.clone());
+                let new_ingredients = ingredients_metadata_from_files(
+                    app_resources_dir.clone(),
+                    full_repo_path.clone(),
+                );
                 *ingredients = new_ingredients;
             }
             if let type_info = metadata_struct.r#type {
                 let mut type_ob = type_info.as_object().unwrap().clone();
                 let flavor_type_ob = type_ob["flavorType"].as_object_mut().unwrap();
-                let new_current_scope = ingredients_scopes_from_files(app_resources_dir, full_repo_path.clone());
-                flavor_type_ob["currentScope"] = serde_json::from_str(serde_json::to_string(&new_current_scope).unwrap().as_str()).unwrap();
-                metadata_struct.r#type = serde_json::from_str(serde_json::to_string(&type_ob).unwrap().as_str()).unwrap();
+                let new_current_scope =
+                    ingredients_scopes_from_files(app_resources_dir, full_repo_path.clone());
+                flavor_type_ob["currentScope"] = serde_json::from_str(
+                    serde_json::to_string(&new_current_scope).unwrap().as_str(),
+                )
+                .unwrap();
+                metadata_struct.r#type =
+                    serde_json::from_str(serde_json::to_string(&type_ob).unwrap().as_str())
+                        .unwrap();
             }
 
             // Write metadata
@@ -183,7 +208,10 @@ pub async fn post_raw_ingredient(
                 Err(e) => {
                     return not_ok_json_response(
                         Status::InternalServerError,
-                        make_bad_json_data_response(format!("Could not make metadata as JSON: {}", e)),
+                        make_bad_json_data_response(format!(
+                            "Could not make metadata as JSON: {}",
+                            e
+                        )),
                     )
                 }
             };
@@ -192,7 +220,10 @@ pub async fn post_raw_ingredient(
                 Err(e) => {
                     return not_ok_json_response(
                         Status::InternalServerError,
-                        make_bad_json_data_response(format!("Could not write metadata to repo: {}", e)),
+                        make_bad_json_data_response(format!(
+                            "Could not write metadata to repo: {}",
+                            e
+                        )),
                     )
                 }
             }
@@ -202,4 +233,3 @@ pub async fn post_raw_ingredient(
         not_ok_bad_repo_json_response()
     }
 }
-

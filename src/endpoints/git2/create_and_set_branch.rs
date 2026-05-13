@@ -37,7 +37,10 @@ pub async fn create_and_set_branch(
     let result = git_dispatch::run_locked_write(locks, pools, &lang, move || {
         let repo = Repository::open(&repo_path_string)
             .map_err(|e| format!("could not open repo: {}", e))?;
-        if repo.find_branch(&branch_ref_owned, BranchType::Local).is_ok() {
+        if repo
+            .find_branch(&branch_ref_owned, BranchType::Local)
+            .is_ok()
+        {
             return Err(format!("Branch {} already exists", &branch_ref_owned));
         }
         let head_commit = repo

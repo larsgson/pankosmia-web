@@ -1,21 +1,19 @@
-use crate::structs::{
-    AppSettings, BurritoMetadata, NewScriptureBookForm,
-};
 use crate::store::SharedProjectStore;
+use crate::structs::{AppSettings, BurritoMetadata, NewScriptureBookForm};
 use crate::utils::burrito::{ingredients_metadata_from_files, ingredients_scopes_from_files};
 use crate::utils::files::load_json;
-use crate::utils::json_responses::{make_bad_json_data_response};
+use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_local_path_components, os_slash_str};
 use crate::utils::response::{
     not_ok_bad_repo_json_response, not_ok_json_response, ok_ok_json_response,
 };
+use copy_dir::copy_dir;
 use rocket::http::{ContentType, Status};
 use rocket::response::status;
 use rocket::serde::json::Json;
 use rocket::{post, State};
 use serde_json::Value;
-use std::path::{Components, PathBuf, Path};
-use copy_dir::copy_dir;
+use std::path::{Components, Path, PathBuf};
 
 /// *`POST /new-scripture-book/<repo_path>`*
 ///
@@ -60,11 +58,7 @@ pub async fn new_scripture_book(
             os_slash_str(),
             &repo_name
         );
-        let path_to_repo_metadata = format!(
-            "{}{}metadata.json",
-            full_repo_dir,
-            os_slash_str(),
-        );
+        let path_to_repo_metadata = format!("{}{}metadata.json", full_repo_dir, os_slash_str(),);
         let metadata_string = match std::fs::read_to_string(&path_to_repo_metadata) {
             Ok(v) => v,
             Err(e) => {
@@ -169,7 +163,7 @@ pub async fn new_scripture_book(
                     return not_ok_json_response(
                         Status::InternalServerError,
                         make_bad_json_data_response(format!("No VRS template for {} found in repo and no versification name provided in API call", vrs_name.clone())),
-                    )
+                    );
                 };
                 // -- copy from template to repo, and we're good to go
                 match copy_dir(&path_to_template_vrs, &path_to_repo_vrs) {
@@ -177,7 +171,10 @@ pub async fn new_scripture_book(
                     Err(e) => {
                         return not_ok_json_response(
                             Status::BadRequest,
-                            make_bad_json_data_response(format!("could not copy vrs from template to repo: {}", e).to_string()),
+                            make_bad_json_data_response(
+                                format!("could not copy vrs from template to repo: {}", e)
+                                    .to_string(),
+                            ),
                         )
                     }
                 }
@@ -209,17 +206,18 @@ pub async fn new_scripture_book(
                     )
                 }
             };
-            let book_max_verses_arr =
-                match &max_verses_ob[&json_form.book_code.clone()] {
-                    Value::Array(a) => a,
-                    _ => return not_ok_json_response(
+            let book_max_verses_arr = match &max_verses_ob[&json_form.book_code.clone()] {
+                Value::Array(a) => a,
+                _ => {
+                    return not_ok_json_response(
                         Status::InternalServerError,
                         make_bad_json_data_response(format!(
                             "Could not find maxVerses for {} in versification JSON for this repo",
                             json_form.book_code.clone(),
                         )),
-                    ),
-                };
+                    )
+                }
+            };
             let mut chapter_number = 0;
             for max_verse in book_max_verses_arr {
                 chapter_number += 1;
@@ -233,8 +231,7 @@ pub async fn new_scripture_book(
             // Insert
             usfm_string = usfm_string.replace("%%STUBCONTENT%%", cv_bits.join("\n").as_str());
         } else {
-            usfm_string =
-                usfm_string.replace("%%STUBCONTENT%%", "\\c 1\n\\p\n\\v 1\n___");
+            usfm_string = usfm_string.replace("%%STUBCONTENT%%", "\\c 1\n\\p\n\\v 1\n___");
         }
         // Save USFM
         let path_to_new_book = format!(
@@ -259,15 +256,20 @@ pub async fn new_scripture_book(
         }
         // Add ingredient record and currentScope value for USFM
         if let mut ingredients = metadata_struct.ingredients.lock().unwrap() {
-            let new_ingredients = ingredients_metadata_from_files(app_resources_dir.clone(), full_repo_dir.clone());
+            let new_ingredients =
+                ingredients_metadata_from_files(app_resources_dir.clone(), full_repo_dir.clone());
             *ingredients = new_ingredients;
         }
         if let type_info = metadata_struct.r#type {
             let mut type_ob = type_info.as_object().unwrap().clone();
             let flavor_type_ob = type_ob["flavorType"].as_object_mut().unwrap();
-            let new_current_scope = ingredients_scopes_from_files(app_resources_dir, full_repo_dir.clone());
-            flavor_type_ob["currentScope"] = serde_json::from_str(serde_json::to_string(&new_current_scope).unwrap().as_str()).unwrap();
-            metadata_struct.r#type = serde_json::from_str(serde_json::to_string(&type_ob).unwrap().as_str()).unwrap();
+            let new_current_scope =
+                ingredients_scopes_from_files(app_resources_dir, full_repo_dir.clone());
+            flavor_type_ob["currentScope"] =
+                serde_json::from_str(serde_json::to_string(&new_current_scope).unwrap().as_str())
+                    .unwrap();
+            metadata_struct.r#type =
+                serde_json::from_str(serde_json::to_string(&type_ob).unwrap().as_str()).unwrap();
         }
 
         // Write metadata

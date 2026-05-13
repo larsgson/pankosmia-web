@@ -1,6 +1,6 @@
 use crate::structs::AppSettings;
 use crate::utils::response::ok_json_response;
-use rocket::http::{ContentType};
+use rocket::http::ContentType;
 use rocket::response::status;
 use rocket::{get, State};
 

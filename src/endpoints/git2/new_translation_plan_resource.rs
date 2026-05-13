@@ -1,5 +1,5 @@
-use crate::structs::AppSettings;
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::utils::files::load_json;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::os_slash_str;
@@ -29,11 +29,14 @@ pub struct NewTranslationPlanContentForm {
     pub content_abbr: String,
     pub content_language_code: String,
     pub versification: Option<String>,
-    pub branch_name: Option<String>
+    pub branch_name: Option<String>,
 }
 
 #[post(
-    "/new-translation-plan-resource", format = "json", data = "<json_form>")]
+    "/new-translation-plan-resource",
+    format = "json",
+    data = "<json_form>"
+)]
 pub fn new_translation_plan_resource_repo(
     state: &State<AppSettings>,
     store: &State<SharedProjectStore>,
@@ -51,9 +54,7 @@ pub fn new_translation_plan_resource_repo(
     if !std::path::Path::new(&path_to_template).is_file() {
         return not_ok_json_response(
             Status::BadRequest,
-            make_bad_json_data_response(format!(
-                "Metadata template not found"
-            )),
+            make_bad_json_data_response(format!("Metadata template not found")),
         );
     }
     // Build path for new repo and parent

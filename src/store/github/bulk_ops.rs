@@ -92,6 +92,11 @@ pub struct BulkOutcome {
     pub written_paths: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_bytes: Option<u64>,
+    /// Optional op-specific fields merged into the response JSON.
+    /// Used by `RegenerateMetadata` for `ingredient_count`,
+    /// `added_count`, `removed_count`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extras: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 /// One file destined for a bulk write. Path is repo-relative
@@ -118,6 +123,14 @@ pub enum BulkOp {
     /// Replace the entire working tree with `files`. Anything not in
     /// `files` is removed.
     ReplaceTree { files: Vec<BulkFile> },
+    /// Regenerate `metadata.json`'s `ingredients` map from the
+    /// current working-branch tree under `ingredients/`. The
+    /// per-blob `checksum` field uses the **git blob sha1** (taken
+    /// directly from the tree response, not md5). This avoids the
+    /// per-blob downloads that an md5 strategy would require; the
+    /// trade-off is a documented behaviour delta vs FS mode (which
+    /// uses md5).
+    RegenerateMetadata { app_resources_dir: String },
 }
 
 /// Per-language locking + Git Data API sequence. Idempotent on the
@@ -170,7 +183,13 @@ pub async fn apply_bulk_op(
 
     let head_query = format!("{}:{}", owner, working_branch);
     let existing_pr: Option<GithubPullRequest> = github_client
-        .list_pulls(&token, &upstream, Some(&head_query), Some(&base_branch), "open")
+        .list_pulls(
+            &token,
+            &upstream,
+            Some(&head_query),
+            Some(&base_branch),
+            "open",
+        )
         .await?
         .into_iter()
         .next();
@@ -247,6 +266,7 @@ pub async fn apply_bulk_op(
                     deleted_paths: Some(deleted),
                     written_paths: None,
                     total_bytes: None,
+                    extras: None,
                 },
             )
         }
@@ -278,6 +298,7 @@ pub async fn apply_bulk_op(
                     deleted_paths: None,
                     written_paths: Some(written_paths),
                     total_bytes: Some(total_bytes),
+                    extras: None,
                 },
             )
         }
@@ -303,6 +324,73 @@ pub async fn apply_bulk_op(
                     deleted_paths: None,
                     written_paths: Some(paths),
                     total_bytes: Some(total_bytes),
+                    extras: None,
+                },
+            )
+        }
+        BulkOp::RegenerateMetadata { app_resources_dir } => {
+            let (entries, truncated) = github_client
+                .get_tree_recursive(&token, &upstream, &current_tree_sha)
+                .await?;
+            if truncated {
+                return Err(BulkOpError::Invalid(
+                    "tree truncated — repository too large for metadata regen".into(),
+                ));
+            }
+            // Build the new ingredients map from the tree.
+            let new_ingredients = build_ingredients_from_tree(&entries, app_resources_dir);
+
+            // Read current metadata.json (via Contents API; the
+            // working branch may have a different version than
+            // upstream).
+            let metadata_bytes = github_client
+                .get_file_bytes(&token, &upstream, "metadata.json", &working_branch)
+                .await?
+                .ok_or_else(|| {
+                    BulkOpError::Invalid("metadata.json not present on working branch".into())
+                })?;
+            let mut metadata_value: serde_json::Value = serde_json::from_slice(&metadata_bytes)
+                .map_err(|e| BulkOpError::Invalid(format!("metadata.json parse: {}", e)))?;
+
+            // Compute added / removed for the response.
+            let old_keys: std::collections::BTreeSet<String> = metadata_value
+                .get("ingredients")
+                .and_then(|v| v.as_object())
+                .map(|o| o.keys().cloned().collect())
+                .unwrap_or_default();
+            let new_keys: std::collections::BTreeSet<String> =
+                new_ingredients.keys().cloned().collect();
+            let added_count = new_keys.difference(&old_keys).count();
+            let removed_count = old_keys.difference(&new_keys).count();
+            let ingredient_count = new_ingredients.len();
+
+            metadata_value["ingredients"] = serde_json::to_value(&new_ingredients)
+                .map_err(|e| BulkOpError::Invalid(format!("serialize: {}", e)))?;
+            let new_metadata_bytes = serde_json::to_vec_pretty(&metadata_value)
+                .map_err(|e| BulkOpError::Invalid(format!("re-serialize: {}", e)))?;
+
+            let blob_sha = github_client
+                .create_blob(&token, &upstream, &new_metadata_bytes)
+                .await?;
+
+            let mut extras = serde_json::Map::new();
+            extras.insert(
+                "ingredient_count".into(),
+                serde_json::json!(ingredient_count),
+            );
+            extras.insert("added_count".into(), serde_json::json!(added_count));
+            extras.insert("removed_count".into(), serde_json::json!(removed_count));
+
+            (
+                vec!["metadata.json".to_string()],
+                vec![Some(blob_sha)],
+                Some(current_tree_sha.as_str()),
+                ResponseMeta {
+                    status: "regenerated",
+                    deleted_paths: None,
+                    written_paths: Some(vec!["metadata.json".to_string()]),
+                    total_bytes: Some(new_metadata_bytes.len() as u64),
+                    extras: Some(extras),
                 },
             )
         }
@@ -325,8 +413,10 @@ pub async fn apply_bulk_op(
         .create_tree(&token, &upstream, use_base_tree, &tree_entries)
         .await?;
 
-    let coauthor_email =
-        format!("{}+{}@{}", github_user_id, login, COMMIT_AUTHOR_EMAIL_DOMAIN);
+    let coauthor_email = format!(
+        "{}+{}@{}",
+        github_user_id, login, COMMIT_AUTHOR_EMAIL_DOMAIN
+    );
     let full_message = format!(
         "{}\n\nCo-authored-by: {} <{}>",
         commit_message, login, coauthor_email
@@ -381,7 +471,68 @@ pub async fn apply_bulk_op(
         deleted_paths: response_meta.deleted_paths,
         written_paths: response_meta.written_paths,
         total_bytes: response_meta.total_bytes,
+        extras: response_meta.extras,
     })
+}
+
+/// Walk a tree and produce the burrito `ingredients` map. Uses the
+/// git blob sha1 as `checksum.sha1` (NOT md5 — see `BulkOp::RegenerateMetadata`
+/// docs for the rationale).
+fn build_ingredients_from_tree(
+    entries: &[crate::auth::github_client::GithubTreeEntry],
+    app_resources_dir: &str,
+) -> std::collections::BTreeMap<String, crate::structs::BurritoMetadataIngredient> {
+    use regex::Regex;
+    use serde_json::json;
+    let mut out = std::collections::BTreeMap::new();
+    let bible_regex = Regex::new("^[1-6A-Z]{3}$").unwrap();
+    let canonical = crate::utils::bcv_ref::canonical_book_codes(app_resources_dir.to_string());
+    for e in entries {
+        if e.entry_type != "blob" {
+            continue;
+        }
+        // Mirror FS-mode exclusions: skip hidden, skip metadata.json itself, skip .bak.
+        if e.path.starts_with('.') || e.path.contains("/.") {
+            continue;
+        }
+        if e.path == "metadata.json" {
+            continue;
+        }
+        let leaf = e.path.rsplit('/').next().unwrap_or(&e.path);
+        let parts: Vec<&str> = leaf.split('.').collect();
+        if parts.len() < 2 {
+            continue;
+        }
+        if parts.len() == 3 && parts[2] == "bak" {
+            continue;
+        }
+        let first = parts[0].to_string();
+        let scope = if bible_regex.is_match(&first) && canonical.contains(&first) {
+            Some(json!({ first.clone(): [] }))
+        } else {
+            None
+        };
+        let sha = e.sha.clone().unwrap_or_default();
+        let size = e.size.unwrap_or(0) as usize;
+        let mime_type = mime_infer::from_path(&e.path)
+            .first()
+            .map(|m| m.to_string())
+            .unwrap_or_else(|| {
+                if parts.len() == 2 && (parts[1] == "usfm" || parts[1] == "vrs") {
+                    "text/plain".to_string()
+                } else {
+                    "application/octet-stream".to_string()
+                }
+            });
+        let entry = crate::structs::BurritoMetadataIngredient {
+            checksum: json!({ "sha1": sha }),
+            mimeType: mime_type,
+            size,
+            scope,
+        };
+        out.insert(e.path.clone(), entry);
+    }
+    out
 }
 
 struct ResponseMeta {
@@ -389,6 +540,7 @@ struct ResponseMeta {
     deleted_paths: Option<Vec<String>>,
     written_paths: Option<Vec<String>>,
     total_bytes: Option<u64>,
+    extras: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 fn working_branch_for(login: &str) -> String {
@@ -468,9 +620,18 @@ mod tests {
 
     #[test]
     fn prefix_match_is_path_prefix() {
-        assert!(path_matches_prefix("ingredients/MAT/1.usfm", "ingredients/"));
-        assert!(path_matches_prefix("ingredients/MAT/1.usfm", "ingredients/MAT/"));
-        assert!(!path_matches_prefix("ingredients/MAT/1.usfm", "ingredients/JHN/"));
+        assert!(path_matches_prefix(
+            "ingredients/MAT/1.usfm",
+            "ingredients/"
+        ));
+        assert!(path_matches_prefix(
+            "ingredients/MAT/1.usfm",
+            "ingredients/MAT/"
+        ));
+        assert!(!path_matches_prefix(
+            "ingredients/MAT/1.usfm",
+            "ingredients/JHN/"
+        ));
         assert!(!path_matches_prefix("ingredients_OTHER/x", "ingredients/"));
         assert!(path_matches_prefix("anything", "")); // empty prefix = match all
     }

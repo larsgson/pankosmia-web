@@ -1,13 +1,13 @@
-use crate::structs::AppSettings;
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::structs::BytesOrError;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, os_slash_str};
+use crate::utils::zip::make_zip_file;
 use rocket::http::{ContentType, Status};
 use rocket::response::status;
 use rocket::{get, State};
 use std::path::{Components, PathBuf};
-use crate::utils::zip::{make_zip_file};
 
 /// *`GET /zipped/<repo_path>`*
 ///
@@ -21,8 +21,7 @@ pub async fn get_zipped_repo(
     repo_path: PathBuf,
 ) -> status::Custom<(ContentType, BytesOrError)> {
     let path_components: Components<'_> = repo_path.components();
-    if check_path_components(&mut path_components.clone())
-    {
+    if check_path_components(&mut path_components.clone()) {
         // Find directory
         let path_to_repo = format!(
             "{}{}{}",
@@ -35,30 +34,25 @@ pub async fn get_zipped_repo(
                 Status::BadRequest,
                 (
                     ContentType::JSON,
-                    BytesOrError::Error(
-                        make_bad_json_data_response(
-                            format!("could not locate repo").to_string(),
-                        ),
-                    ),
+                    BytesOrError::Error(make_bad_json_data_response(
+                        format!("could not locate repo").to_string(),
+                    )),
                 ),
             );
         }
         let temp_zip_path = make_zip_file(&path_to_repo);
         match std::fs::read(&temp_zip_path) {
-            Ok(b) => status::Custom(
-                Status::Ok,
-                (
-                    ContentType::ZIP,
-                    BytesOrError::Bytes(b),
-                ),
-            ),
+            Ok(b) => status::Custom(Status::Ok, (ContentType::ZIP, BytesOrError::Bytes(b))),
             Err(e) => status::Custom(
                 Status::InternalServerError,
                 (
                     ContentType::JSON,
-                    BytesOrError::Error(make_bad_json_data_response(format!("Could not read zip: {}", e))),
+                    BytesOrError::Error(make_bad_json_data_response(format!(
+                        "Could not read zip: {}",
+                        e
+                    ))),
                 ),
-            )
+            ),
         }
     } else {
         status::Custom(

@@ -1,5 +1,5 @@
-use serde_json::Value;
 use crate::utils::paths::os_slash_str;
+use serde_json::Value;
 
 pub fn canonical_book_codes(app_resources_dir: String) -> Vec<String> {
     let versification_path = format!(
@@ -22,8 +22,8 @@ pub fn canonical_book_codes(app_resources_dir: String) -> Vec<String> {
             for (key, _value) in max_verses {
                 books.push(key.clone());
             }
-        },
-        Err(_) => panic!("Read VRS")
+        }
+        Err(_) => panic!("Read VRS"),
     }
     books
 }

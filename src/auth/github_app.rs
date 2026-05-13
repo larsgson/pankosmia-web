@@ -52,8 +52,10 @@ pub enum GithubAppError {
     Decode(String),
     #[error("clock: {0}")]
     Clock(String),
-    #[error("no installation id configured for language '{0}' and no \
-             PANKOSMIA_DEFAULT_INSTALLATION_ID env var set")]
+    #[error(
+        "no installation id configured for language '{0}' and no \
+             PANKOSMIA_DEFAULT_INSTALLATION_ID env var set"
+    )]
     NoInstallationId(String),
 }
 
@@ -132,9 +134,7 @@ impl GithubAppAuth {
         };
         let pem_bytes = match std::env::var("GITHUB_APP_PRIVATE_KEY_PATH") {
             Ok(p) if !p.is_empty() => {
-                std::fs::read(&p).map_err(|e| {
-                    GithubAppError::Key(format!("read {}: {}", p, e))
-                })?
+                std::fs::read(&p).map_err(|e| GithubAppError::Key(format!("read {}: {}", p, e)))?
             }
             _ => match std::env::var("GITHUB_APP_PRIVATE_KEY") {
                 Ok(s) if !s.is_empty() => s.into_bytes(),
@@ -170,10 +170,7 @@ impl GithubAppAuth {
     /// Get a usable installation token for `installation_id`. Returns
     /// a cached one if still fresh; otherwise calls GitHub to mint a
     /// new one.
-    pub async fn installation_token(
-        &self,
-        installation_id: u64,
-    ) -> Result<String, GithubAppError> {
+    pub async fn installation_token(&self, installation_id: u64) -> Result<String, GithubAppError> {
         let now = SystemTime::now();
         if let Some(cached) = self.cache.lock().get(&installation_id).cloned() {
             if cached.is_fresh(now) {
@@ -209,8 +206,8 @@ impl GithubAppAuth {
         let expires_at = chrono::DateTime::parse_from_rfc3339(&body.expires_at)
             .map_err(|e| GithubAppError::Decode(format!("expires_at: {}", e)))?
             .with_timezone(&chrono::Utc);
-        let expires_at = SystemTime::UNIX_EPOCH
-            + Duration::from_secs(expires_at.timestamp() as u64);
+        let expires_at =
+            SystemTime::UNIX_EPOCH + Duration::from_secs(expires_at.timestamp() as u64);
         let cached = CachedToken {
             token: body.token.clone(),
             expires_at,

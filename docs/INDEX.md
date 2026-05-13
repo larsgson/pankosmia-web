@@ -33,7 +33,7 @@ next** (the implementation specs under `impl/`).
 | File | Implements | Effort | Status |
 |---|---|---|---|
 | `impl/AUDIO_STRATEGY.md` | External audio model (Internet Archive primary, paste-URL fallback). Server-side: validate audio reference JSON, license allowlist. | ~2 days | **Shipped.** See `CLIENT_INTEGRATION.md` §7b. |
-| `impl/BULK_OPS.md` | The four 501 endpoints via GitHub Git Data API for atomic multi-file commits. | ~5–8 days | **3 of 4 shipped** (delete-by-prefix, zip ingest, whole-repo replace). The 4th — metadata regeneration — stays 501 pending a checksum-strategy decision. See `CLIENT_INTEGRATION.md` §7c and §14. |
+| `impl/BULK_OPS.md` | The four 501 endpoints via GitHub Git Data API for atomic multi-file commits. | ~5–8 days | **Shipped.** Includes metadata regeneration, which uses git blob sha1 as the checksum (documented behaviour delta from the FS-mode md5 — see `CLIENT_INTEGRATION.md` §7c). |
 
 ### Deferred (documented but not in current scope)
 

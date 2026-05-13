@@ -104,10 +104,7 @@ pub async fn copy_repo(
     };
     match join.await {
         Ok(Ok(())) => ok_ok_json_response(),
-        Ok(Err(msg)) => not_ok_json_response(
-            Status::BadRequest,
-            make_bad_json_data_response(msg),
-        ),
+        Ok(Err(msg)) => not_ok_json_response(Status::BadRequest, make_bad_json_data_response(msg)),
         Err(e) => not_ok_json_response(
             Status::InternalServerError,
             make_bad_json_data_response(format!("copy task panic: {}", e)),

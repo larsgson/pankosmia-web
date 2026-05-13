@@ -14,9 +14,7 @@ use pankosmia_docker::endpoints::burrito2::raw_text_ingredient::{
 use pankosmia_docker::identity::LanguageCode;
 use pankosmia_docker::server::WatcherRegistry;
 use pankosmia_docker::store::{fs::FsLanguageStore, SharedProjectStore};
-use pankosmia_docker::structs::{
-    AppSettings, Bcv, ProductSpec, ProjectIdentifier, Typography,
-};
+use pankosmia_docker::structs::{AppSettings, Bcv, ProductSpec, ProjectIdentifier, Typography};
 use rocket::http::{Accept, ContentType, Status};
 use rocket::local::asynchronous::Client;
 use rocket::routes;

@@ -48,8 +48,7 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     // `<APP_RESOURCES_DIR>/product/{product,client_config}.json`.
     // Legacy fallback: `<binary>/../../lib/app_resources/product/...`
     // (pankosmia-web bundled the binary under `target/lib/app_resources/...`).
-    let app_resources_for_product =
-        get_string_value_by_key(&launch_config, "app_resources_path");
+    let app_resources_for_product = get_string_value_by_key(&launch_config, "app_resources_path");
     let preferred_product_path = format!(
         "{}product{}product.json",
         ensure_trailing_slash(&app_resources_for_product),
@@ -242,26 +241,44 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     let msg_queue = MsgQueue::new(Mutex::new(VecDeque::new()));
     my_rocket = my_rocket.manage(msg_queue).manage(clients);
 
-    // Catalog registry (G2). Empty by default; for hosted
-    // STORAGE_BACKEND=github, populated at startup from the
-    // catalog repo's local clone or from a manually-provided yaml
-    // path via PANKOSMIA_CATALOG_PATH.
+    // Catalog registry. Sourced from either:
+    //   - a GitHub catalog repo (PANKOSMIA_CATALOG_REPO) — cloned to
+    //     <workspace>/.pankosmia/catalog/ and refreshed on webhook
+    //     and periodic fetch.
+    //   - a local file path (PANKOSMIA_CATALOG_PATH) — read once at
+    //     boot; operators manage updates externally (e.g. image
+    //     rebuild for the baked-default case).
     let catalog = Arc::new(crate::catalog::CatalogRegistry::empty());
-    if let Ok(path) = env::var("PANKOSMIA_CATALOG_PATH") {
-        match std::fs::read_to_string(&path) {
-            Ok(yaml) => match catalog.reload_from_yaml(&yaml) {
-                Ok(diff) => println!(
-                    "Catalog loaded from {}: {} added, {} removed",
-                    path,
-                    diff.added.len(),
-                    diff.removed.len()
-                ),
-                Err(e) => println!("WARN: catalog parse error: {}", e),
-            },
-            Err(e) => println!("WARN: could not read catalog at {}: {}", path, e),
+    let catalog_sync = std::sync::Arc::new(crate::catalog::CatalogSync::from_env(
+        std::path::Path::new(&working_dir_path),
+    ));
+    if let Some(slug) = &catalog_sync.repo_slug {
+        println!(
+            "Catalog source: github repo {} → {}",
+            slug,
+            catalog_sync.file_path.display()
+        );
+        if let Err(e) = catalog_sync.ensure_clone() {
+            eprintln!("WARN: catalog clone failed: {}", e);
         }
+    } else {
+        println!(
+            "Catalog source: local file {}",
+            catalog_sync.file_path.display()
+        );
     }
-    my_rocket = my_rocket.manage(catalog.clone());
+    match catalog_sync.refresh(&catalog) {
+        Ok(diff) => println!(
+            "Catalog loaded from {}: {} added, {} removed",
+            catalog_sync.file_path.display(),
+            diff.added.len(),
+            diff.removed.len()
+        ),
+        Err(e) => eprintln!("WARN: catalog refresh failed at boot: {}", e),
+    }
+    my_rocket = my_rocket
+        .manage(catalog.clone())
+        .manage(catalog_sync.clone());
 
     // Phase 2 storage abstraction. Endpoints call this trait object
     // instead of `std::fs::*` directly. The runtime selector picks
@@ -276,6 +293,7 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     if let Some(interval) = crate::server::periodic_fetch::interval_from_env() {
         crate::server::periodic_fetch::spawn(
             catalog.clone(),
+            catalog_sync.clone(),
             project_store.clone(),
             interval,
         );
@@ -302,8 +320,7 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     // rest of the server still works.
     let github_client_id = env::var("GITHUB_CLIENT_ID").unwrap_or_default();
     let github_client_secret = env::var("GITHUB_CLIENT_SECRET").unwrap_or_default();
-    let github_client =
-        crate::auth::GithubClient::new(github_client_id, github_client_secret);
+    let github_client = crate::auth::GithubClient::new(github_client_id, github_client_secret);
     my_rocket = my_rocket
         .manage(github_client.clone())
         .manage(crate::auth::TokenStore::from_env(std::path::PathBuf::from(

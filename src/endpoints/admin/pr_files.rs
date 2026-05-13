@@ -22,15 +22,8 @@ pub async fn list_pr_files(
     language: String,
     pr: u64,
 ) -> status::Custom<(ContentType, String)> {
-    let ctx = match context::resolve(
-        cookies,
-        catalog,
-        app_auth,
-        tokens,
-        github_client,
-        &language,
-    )
-    .await
+    let ctx = match context::resolve(cookies, catalog, app_auth, tokens, github_client, &language)
+        .await
     {
         Ok(c) => c,
         Err(resp) => return resp,

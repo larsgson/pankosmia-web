@@ -100,10 +100,7 @@ fn default_bcv() -> Bcv {
 impl ProjectStore for FsLanguageStore {
     // --- identity & membership ------------------------------------
 
-    async fn list_user_languages(
-        &self,
-        _user: UserId,
-    ) -> StoreResult<Vec<ProjectSummary>> {
+    async fn list_user_languages(&self, _user: UserId) -> StoreResult<Vec<ProjectSummary>> {
         // FS mode: walk `.pankosmia/languages/` for known languages.
         // The implicit-Owner rule applies, so any language we know
         // about is one this user has access to.
@@ -133,21 +130,13 @@ impl ProjectStore for FsLanguageStore {
         Ok(out)
     }
 
-    async fn project_role(
-        &self,
-        _user: UserId,
-        _lang: LanguageCode,
-    ) -> StoreResult<Option<Role>> {
+    async fn project_role(&self, _user: UserId, _lang: LanguageCode) -> StoreResult<Option<Role>> {
         // Single-tenant FS: every user has Owner on every language.
         // See module docs for the rationale.
         Ok(Some(Role::Owner))
     }
 
-    async fn create_project(
-        &self,
-        owner: UserId,
-        spec: NewProject,
-    ) -> StoreResult<()> {
+    async fn create_project(&self, owner: UserId, spec: NewProject) -> StoreResult<()> {
         let dir = paths::language_dir(&self.root, &spec.language);
         fs::create_dir_all(&dir)?;
         let mut m = MembersFile::default();
@@ -156,12 +145,7 @@ impl ProjectStore for FsLanguageStore {
         write_json(&paths::members_file(&self.root, &spec.language), &m)
     }
 
-    async fn add_member(
-        &self,
-        lang: LanguageCode,
-        user: UserId,
-        role: Role,
-    ) -> StoreResult<()> {
+    async fn add_member(&self, lang: LanguageCode, user: UserId, role: Role) -> StoreResult<()> {
         let f = paths::members_file(&self.root, &lang);
         let mut m: MembersFile = read_json_or_default(&f)?;
         m.members.insert(user.to_string(), role);
@@ -193,11 +177,7 @@ impl ProjectStore for FsLanguageStore {
         }
     }
 
-    async fn put_languages(
-        &self,
-        user: UserId,
-        langs: Vec<LanguageCode>,
-    ) -> StoreResult<()> {
+    async fn put_languages(&self, user: UserId, langs: Vec<LanguageCode>) -> StoreResult<()> {
         let mut s = match self.get_user_settings(user).await {
             Ok(s) => s,
             Err(StoreError::NotFound) => UserSettings {
@@ -259,34 +239,20 @@ impl ProjectStore for FsLanguageStore {
         Ok(serde_json::from_slice(&bytes)?)
     }
 
-    async fn put_bcv(
-        &self,
-        lang: LanguageCode,
-        user: UserId,
-        bcv: Bcv,
-    ) -> StoreResult<()> {
+    async fn put_bcv(&self, lang: LanguageCode, user: UserId, bcv: Bcv) -> StoreResult<()> {
         write_json(&paths::bcv_file(&self.root, &lang, user), &bcv)
     }
 
     // --- gitea OAuth (per-user) -----------------------------------
 
-    async fn get_auth_token(
-        &self,
-        user: UserId,
-        key: &str,
-    ) -> StoreResult<Option<String>> {
+    async fn get_auth_token(&self, user: UserId, key: &str) -> StoreResult<Option<String>> {
         paths::validate_segment(key)?;
         let f = paths::user_auth_tokens_file(&self.root, user);
         let m: BTreeMap<String, String> = read_json_or_default(&f)?;
         Ok(m.get(key).cloned())
     }
 
-    async fn put_auth_token(
-        &self,
-        user: UserId,
-        key: &str,
-        code: &str,
-    ) -> StoreResult<()> {
+    async fn put_auth_token(&self, user: UserId, key: &str, code: &str) -> StoreResult<()> {
         paths::validate_segment(key)?;
         let f = paths::user_auth_tokens_file(&self.root, user);
         let mut m: BTreeMap<String, String> = read_json_or_default(&f)?;
@@ -302,12 +268,7 @@ impl ProjectStore for FsLanguageStore {
         write_json(&f, &m)
     }
 
-    async fn put_auth_request(
-        &self,
-        user: UserId,
-        key: &str,
-        req: AuthRequest,
-    ) -> StoreResult<()> {
+    async fn put_auth_request(&self, user: UserId, key: &str, req: AuthRequest) -> StoreResult<()> {
         paths::validate_segment(key)?;
         let f = paths::user_auth_requests_file(&self.root, user);
         let mut m: BTreeMap<String, AuthRequest> = read_json_or_default(&f)?;
@@ -315,11 +276,7 @@ impl ProjectStore for FsLanguageStore {
         write_json(&f, &m)
     }
 
-    async fn take_auth_request(
-        &self,
-        user: UserId,
-        key: &str,
-    ) -> StoreResult<Option<AuthRequest>> {
+    async fn take_auth_request(&self, user: UserId, key: &str) -> StoreResult<Option<AuthRequest>> {
         paths::validate_segment(key)?;
         let f = paths::user_auth_requests_file(&self.root, user);
         let mut m: BTreeMap<String, AuthRequest> = read_json_or_default(&f)?;
@@ -331,16 +288,11 @@ impl ProjectStore for FsLanguageStore {
     // --- repo registry --------------------------------------------
 
     async fn list_repos(&self, lang: LanguageCode) -> StoreResult<Vec<RepoRecord>> {
-        let r: RepoRegistry =
-            read_json_or_default(&paths::repo_registry_file(&self.root, &lang))?;
+        let r: RepoRegistry = read_json_or_default(&paths::repo_registry_file(&self.root, &lang))?;
         Ok(r.repos.into_values().collect())
     }
 
-    async fn register_repo(
-        &self,
-        lang: LanguageCode,
-        r: NewRepo,
-    ) -> StoreResult<RepoId> {
+    async fn register_repo(&self, lang: LanguageCode, r: NewRepo) -> StoreResult<RepoId> {
         paths::validate_segment(&r.name)?;
         let f = paths::repo_registry_file(&self.root, &lang);
         let mut reg: RepoRegistry = read_json_or_default(&f)?;
@@ -360,22 +312,14 @@ impl ProjectStore for FsLanguageStore {
         Ok(id)
     }
 
-    async fn unregister_repo(
-        &self,
-        lang: LanguageCode,
-        repo: RepoId,
-    ) -> StoreResult<()> {
+    async fn unregister_repo(&self, lang: LanguageCode, repo: RepoId) -> StoreResult<()> {
         let f = paths::repo_registry_file(&self.root, &lang);
         let mut reg: RepoRegistry = read_json_or_default(&f)?;
         reg.repos.remove(&repo.to_string());
         write_json(&f, &reg)
     }
 
-    async fn lookup_repo(
-        &self,
-        lang: LanguageCode,
-        repo: RepoId,
-    ) -> StoreResult<RepoRecord> {
+    async fn lookup_repo(&self, lang: LanguageCode, repo: RepoId) -> StoreResult<RepoRecord> {
         let reg: RepoRegistry =
             read_json_or_default(&paths::repo_registry_file(&self.root, &lang))?;
         reg.repos
@@ -419,7 +363,10 @@ impl ProjectStore for FsLanguageStore {
         if !dir.exists() {
             return Ok(out);
         }
-        for entry in walkdir::WalkDir::new(&dir).into_iter().filter_map(|e| e.ok()) {
+        for entry in walkdir::WalkDir::new(&dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -464,9 +411,7 @@ impl ProjectStore for FsLanguageStore {
     async fn with_tx<'a>(
         &'a self,
         f: Box<
-            dyn for<'t> FnOnce(&'t mut (dyn Tx + 'a)) -> BoxFuture<'t, StoreResult<()>>
-                + Send
-                + 'a,
+            dyn for<'t> FnOnce(&'t mut (dyn Tx + 'a)) -> BoxFuture<'t, StoreResult<()>> + Send + 'a,
         >,
     ) -> StoreResult<()> {
         // FS no-op: just call through. Endpoints that need real
@@ -483,11 +428,7 @@ struct FsTx<'a> {
 
 #[async_trait]
 impl<'a> Tx for FsTx<'a> {
-    async fn put_app_state(
-        &mut self,
-        lang: LanguageCode,
-        s: AppState,
-    ) -> StoreResult<()> {
+    async fn put_app_state(&mut self, lang: LanguageCode, s: AppState) -> StoreResult<()> {
         self.store.put_app_state(lang, s).await
     }
     async fn put_burrito_metadata(

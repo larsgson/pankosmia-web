@@ -72,9 +72,7 @@ pub async fn set_branch(
 
     match result {
         Ok(()) => ok_ok_json_response(),
-        Err(crate::server::git_dispatch::GitOpError::Git(msg))
-            if msg.contains("Uncommitted") =>
-        {
+        Err(crate::server::git_dispatch::GitOpError::Git(msg)) if msg.contains("Uncommitted") => {
             not_ok_json_response(Status::Conflict, make_bad_json_data_response(msg))
         }
         Err(e) => not_ok_json_response(

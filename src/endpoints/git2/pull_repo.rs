@@ -141,9 +141,7 @@ pub async fn pull_repo(
         } else if analysis.0.is_normal() {
             merge_type = "normal";
             let head_commit = repo
-                .reference_to_annotated_commit(
-                    &repo.head().map_err(|e| format!("head: {}", e))?,
-                )
+                .reference_to_annotated_commit(&repo.head().map_err(|e| format!("head: {}", e))?)
                 .map_err(|e| format!("annotated_commit: {}", e))?;
             has_conflicts = normal_merge(&repo, &head_commit, &fetch_commit)
                 .map_err(|e| format!("Could not normal merge: {}", e))?;

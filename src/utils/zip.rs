@@ -1,11 +1,11 @@
+use crate::utils::paths::os_slash_str;
 use std::fs::File;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 use zip::write::SimpleFileOptions;
 use zip::{ZipArchive, ZipWriter};
-use std::io::{Read, Write};
-use crate::utils::paths::os_slash_str;
 
 /// Make a zip archive as a temporary file, from ingredients under the specified path, and return the temporary file path.
 pub fn make_zip_file(path_to_zip: &String) -> NamedTempFile {
@@ -45,7 +45,11 @@ pub fn make_zip_file(path_to_zip: &String) -> NamedTempFile {
 }
 
 /// Unpack the zip archive at the specified path to the specified destination. The destination directory's parent must exist.
-pub async fn unpack_zip_file(archive_path: NamedTempFile, destination: String,only_depth: Option<usize>) -> Result<(), std::io::Error> {
+pub async fn unpack_zip_file(
+    archive_path: NamedTempFile,
+    destination: String,
+    only_depth: Option<usize>,
+) -> Result<(), std::io::Error> {
     // Make zip struct
     let zip_file = File::open(archive_path).expect("open zip archive file");
     let mut archive = ZipArchive::new(zip_file)?;
@@ -54,7 +58,7 @@ pub async fn unpack_zip_file(archive_path: NamedTempFile, destination: String,on
         let mut file = archive.by_index(i).expect("file from zip");
         let out_path = match file.enclosed_name() {
             Some(p) => p,
-            None => continue
+            None => continue,
         };
         if !file.is_file() {
             continue;
@@ -65,10 +69,13 @@ pub async fn unpack_zip_file(archive_path: NamedTempFile, destination: String,on
                 if components.len() < depth {
                     continue; // skip files shallower than requested depth
                 }
-                components.iter().skip(depth).fold(PathBuf::new(), |mut acc, c| {
-                    acc.push(c.as_os_str());
-                    acc
-                })
+                components
+                    .iter()
+                    .skip(depth)
+                    .fold(PathBuf::new(), |mut acc, c| {
+                        acc.push(c.as_os_str());
+                        acc
+                    })
             }
             None => out_path.clone(), // keep full path
         };
@@ -78,7 +85,9 @@ pub async fn unpack_zip_file(archive_path: NamedTempFile, destination: String,on
             os_slash_str(),
             trimmed_path.display().to_string()
         );
-        let out_path_parent = std::path::Path::new(&full_out_path).parent().expect("parent");
+        let out_path_parent = std::path::Path::new(&full_out_path)
+            .parent()
+            .expect("parent");
         if !out_path_parent.exists() {
             std::fs::create_dir_all(&out_path_parent).expect("create all dirs");
         }

@@ -15,8 +15,7 @@
 
 use crate::auth::github_client::GithubClient;
 use crate::auth::session::{
-    clear_oauth_state, clear_session, read_oauth_state, read_session, set_oauth_state,
-    set_session,
+    clear_oauth_state, clear_session, read_oauth_state, read_session, set_oauth_state, set_session,
 };
 use crate::auth::token_store::TokenStore;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -33,8 +32,7 @@ use uuid::Uuid;
 // classic OAuth `scope=` parameter is ignored. Identity-only login.
 
 fn server_origin() -> String {
-    std::env::var("PANKOSMIA_PUBLIC_ORIGIN")
-        .unwrap_or_else(|_| "http://127.0.0.1:19119".into())
+    std::env::var("PANKOSMIA_PUBLIC_ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:19119".into())
 }
 
 fn callback_url() -> String {
@@ -115,15 +113,12 @@ pub async fn auth_github_callback(
                 make_bad_json_data_response(format!("oauth exchange: {}", e)),
             )
         })?;
-    let user = client
-        .get_user(&token.access_token)
-        .await
-        .map_err(|e| {
-            not_ok_json_response(
-                Status::BadGateway,
-                make_bad_json_data_response(format!("github /user: {}", e)),
-            )
-        })?;
+    let user = client.get_user(&token.access_token).await.map_err(|e| {
+        not_ok_json_response(
+            Status::BadGateway,
+            make_bad_json_data_response(format!("github /user: {}", e)),
+        )
+    })?;
     tokens.save(user.id, &token.access_token).map_err(|e| {
         not_ok_json_response(
             Status::InternalServerError,

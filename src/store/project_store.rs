@@ -23,22 +23,13 @@ pub trait ProjectStore: Send + Sync {
 
     /// Membership role of `user` on `lang`, or `None` if not a
     /// member. Hot path — implementations should be cheap.
-    async fn project_role(
-        &self,
-        user: UserId,
-        lang: LanguageCode,
-    ) -> StoreResult<Option<Role>>;
+    async fn project_role(&self, user: UserId, lang: LanguageCode) -> StoreResult<Option<Role>>;
 
     /// Bootstrap a new language. Reserved for admin / migration
     /// tooling.
     async fn create_project(&self, owner: UserId, spec: NewProject) -> StoreResult<()>;
 
-    async fn add_member(
-        &self,
-        lang: LanguageCode,
-        user: UserId,
-        role: Role,
-    ) -> StoreResult<()>;
+    async fn add_member(&self, lang: LanguageCode, user: UserId, role: Role) -> StoreResult<()>;
     async fn remove_member(&self, lang: LanguageCode, user: UserId) -> StoreResult<()>;
 
     // --- per-user settings -----------------------------------------
@@ -61,44 +52,18 @@ pub trait ProjectStore: Send + Sync {
 
     // --- gitea OAuth (per-user) ------------------------------------
 
-    async fn get_auth_token(
-        &self,
-        user: UserId,
-        key: &str,
-    ) -> StoreResult<Option<String>>;
-    async fn put_auth_token(
-        &self,
-        user: UserId,
-        key: &str,
-        code: &str,
-    ) -> StoreResult<()>;
+    async fn get_auth_token(&self, user: UserId, key: &str) -> StoreResult<Option<String>>;
+    async fn put_auth_token(&self, user: UserId, key: &str, code: &str) -> StoreResult<()>;
     async fn delete_auth_token(&self, user: UserId, key: &str) -> StoreResult<()>;
-    async fn put_auth_request(
-        &self,
-        user: UserId,
-        key: &str,
-        req: AuthRequest,
-    ) -> StoreResult<()>;
-    async fn take_auth_request(
-        &self,
-        user: UserId,
-        key: &str,
-    ) -> StoreResult<Option<AuthRequest>>;
+    async fn put_auth_request(&self, user: UserId, key: &str, req: AuthRequest) -> StoreResult<()>;
+    async fn take_auth_request(&self, user: UserId, key: &str) -> StoreResult<Option<AuthRequest>>;
 
     // --- repo registry --------------------------------------------
 
     async fn list_repos(&self, lang: LanguageCode) -> StoreResult<Vec<RepoRecord>>;
-    async fn register_repo(
-        &self,
-        lang: LanguageCode,
-        r: NewRepo,
-    ) -> StoreResult<RepoId>;
+    async fn register_repo(&self, lang: LanguageCode, r: NewRepo) -> StoreResult<RepoId>;
     async fn unregister_repo(&self, lang: LanguageCode, repo: RepoId) -> StoreResult<()>;
-    async fn lookup_repo(
-        &self,
-        lang: LanguageCode,
-        repo: RepoId,
-    ) -> StoreResult<RepoRecord>;
+    async fn lookup_repo(&self, lang: LanguageCode, repo: RepoId) -> StoreResult<RepoRecord>;
 
     // --- burrito metadata -----------------------------------------
     //
@@ -165,9 +130,7 @@ pub trait ProjectStore: Send + Sync {
     async fn with_tx<'a>(
         &'a self,
         f: Box<
-            dyn for<'t> FnOnce(&'t mut (dyn Tx + 'a)) -> BoxFuture<'t, StoreResult<()>>
-                + Send
-                + 'a,
+            dyn for<'t> FnOnce(&'t mut (dyn Tx + 'a)) -> BoxFuture<'t, StoreResult<()>> + Send + 'a,
         >,
     ) -> StoreResult<()>;
 }
@@ -177,11 +140,7 @@ pub trait ProjectStore: Send + Sync {
 /// single atomic write.
 #[async_trait]
 pub trait Tx: Send {
-    async fn put_app_state(
-        &mut self,
-        lang: LanguageCode,
-        s: AppState,
-    ) -> StoreResult<()>;
+    async fn put_app_state(&mut self, lang: LanguageCode, s: AppState) -> StoreResult<()>;
     async fn put_burrito_metadata(
         &mut self,
         lang: LanguageCode,

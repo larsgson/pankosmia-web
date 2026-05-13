@@ -28,10 +28,7 @@ pub async fn get_bcv(
         Ok(v) => ok_json_response(v),
         Err(e) => not_ok_json_response(
             Status::InternalServerError,
-            make_bad_json_data_response(format!(
-                "Could not parse bcv state as JSON object: {}",
-                e
-            )),
+            make_bad_json_data_response(format!("Could not parse bcv state as JSON object: {}", e)),
         ),
     }
 }

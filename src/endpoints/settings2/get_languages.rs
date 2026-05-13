@@ -40,4 +40,3 @@ pub async fn get_languages(
         ),
     }
 }
-

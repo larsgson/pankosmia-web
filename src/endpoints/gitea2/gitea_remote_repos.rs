@@ -104,11 +104,13 @@ pub fn gitea_remote_repos(
                             Some(s) => s
                                 .to_vec()
                                 .into_iter()
-                                .filter(|e| e.as_object().expect("object in ingredients filter")["exists"].as_bool().expect("exists bool"))
+                                .filter(|e| {
+                                    e.as_object().expect("object in ingredients filter")["exists"]
+                                        .as_bool()
+                                        .expect("exists bool")
+                                })
                                 .map(|e: Value| -> String {
-                                    e.as_object()
-                                        .expect("object in ingredients")
-                                        ["identifier"]
+                                    e.as_object().expect("object in ingredients")["identifier"]
                                         .as_str()
                                         .expect("identifier to str")
                                         .to_string()
@@ -116,12 +118,13 @@ pub fn gitea_remote_repos(
                                 .collect(),
                             None => Vec::new(),
                         },
-                        parent_clone_url: match json_record["parent"].as_object(){
+                        parent_clone_url: match json_record["parent"].as_object() {
                             Some(ob1) => match ob1["html_url"].as_str() {
-                                 Some(s) => s.to_string(),
-                                    _=> "".to_string(),
-                            } _ => "".to_string(),
-                        }
+                                Some(s) => s.to_string(),
+                                _ => "".to_string(),
+                            },
+                            _ => "".to_string(),
+                        },
                     });
                 }
                 ok_json_response(serde_json::to_string(&records).unwrap())

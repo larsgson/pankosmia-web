@@ -1,5 +1,5 @@
-use crate::structs::{AppSettings, BurritoMetadata};
 use crate::store::SharedProjectStore;
+use crate::structs::{AppSettings, BurritoMetadata};
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::os_slash_str;
 use crate::utils::response::{not_ok_json_response, ok_ok_json_response};
@@ -138,10 +138,7 @@ pub fn new_tcore_resource_repo(
         }
     }
     // Init repo
-    let final_new_branch_name = json_form
-        .branch_name
-        .clone()
-        .unwrap_or("main".to_string());
+    let final_new_branch_name = json_form.branch_name.clone().unwrap_or("main".to_string());
     let mut repo_options = RepositoryInitOptions::new();
     let repo_options2 = repo_options.initial_head(final_new_branch_name.as_str());
     let new_repo = match Repository::init_opts(&path_to_new_repo, &repo_options2) {

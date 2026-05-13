@@ -1,7 +1,7 @@
-use crate::structs::{AppSettings};
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::utils::files::load_json;
-use crate::utils::json_responses::{make_bad_json_data_response};
+use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::os_slash_str;
 use crate::utils::response::{not_ok_json_response, ok_ok_json_response};
 use crate::utils::time::utc_now_timestamp_string;
@@ -9,8 +9,8 @@ use git2::{Repository, RepositoryInitOptions};
 use rocket::http::{ContentType, Status};
 use rocket::response::status;
 use rocket::serde::json::Json;
-use rocket::{post, FromForm, State};
 use rocket::serde::Deserialize;
+use rocket::{post, FromForm, State};
 use serde_json::{json, Value};
 
 #[derive(FromForm, Deserialize)]
@@ -26,7 +26,7 @@ pub struct NewTextTranslationContentForm {
     pub book_abbr: Option<String>,
     pub add_cv: Option<bool>,
     pub versification: Option<String>,
-    pub branch_name: Option<String>
+    pub branch_name: Option<String>,
 }
 
 /// *`POST /new-text-translation`*
@@ -169,17 +169,13 @@ pub fn new_text_translation_repo(
             )
         }
     };
-    let path_to_repo_gitignore =
-        format!("{}{}.gitignore", path_to_new_repo, os_slash_str(),);
+    let path_to_repo_gitignore = format!("{}{}.gitignore", path_to_new_repo, os_slash_str(),);
     match std::fs::write(path_to_repo_gitignore, &gitignore_string) {
         Ok(_) => (),
         Err(e) => {
             return not_ok_json_response(
                 Status::InternalServerError,
-                make_bad_json_data_response(format!(
-                    "Could not write gitignore to repo: {}",
-                    e
-                )),
+                make_bad_json_data_response(format!("Could not write gitignore to repo: {}", e)),
             )
         }
     }
@@ -190,13 +186,15 @@ pub fn new_text_translation_repo(
     if json_form.content_language_code.starts_with("x-") {
         language_name = match json_form.content_language_name.clone() {
             Some(n) => n,
-            None => return not_ok_json_response(
-                Status::BadRequest,
-                make_bad_json_data_response(format!(
+            None => {
+                return not_ok_json_response(
+                    Status::BadRequest,
+                    make_bad_json_data_response(format!(
                     "Language code '{}' is custom ('x-') but no language name has been provided",
                     &json_form.content_language_code
                 )),
-            )
+                )
+            }
         }
     } else {
         // Read language lookup
@@ -394,8 +392,7 @@ pub fn new_text_translation_repo(
             // Insert
             usfm_string = usfm_string.replace("%%STUBCONTENT%%", cv_bits.join("\n").as_str());
         } else {
-            usfm_string =
-                usfm_string.replace("%%STUBCONTENT%%", "\\c 1\n\\p\n\\v 1\n___");
+            usfm_string = usfm_string.replace("%%STUBCONTENT%%", "\\c 1\n\\p\n\\v 1\n___");
         }
         // - add ingredient to metadata
         let ingredient_json = json!(

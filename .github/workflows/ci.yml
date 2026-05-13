@@ -50,13 +50,16 @@ jobs:
       - name: cargo test (FS-backend integration)
         run: cargo test --locked --test sse_ingredient --test fs_language_store
 
-      - name: cargo clippy (warnings as errors)
-        run: cargo clippy --locked --all-targets -- -D warnings
-        continue-on-error: true   # allow legacy warnings; remove once clean
-
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
-        continue-on-error: true   # remove once formatting is consistent
+
+      - name: cargo clippy (informational)
+        # Surfaces clippy hints in the build log without failing the
+        # job. The codebase has ~160 legacy warnings from the
+        # pankosmia-web era; clean them in focused passes rather than
+        # in a single sweep. Promote to `-D warnings` once down to
+        # zero.
+        run: cargo clippy --locked --all-targets
 
   docker:
     name: Docker image

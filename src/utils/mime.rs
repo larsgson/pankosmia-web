@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use rocket::http::ContentType;
+use std::collections::BTreeMap;
 
 pub(crate) fn mime_types() -> BTreeMap<String, ContentType> {
     BTreeMap::from([

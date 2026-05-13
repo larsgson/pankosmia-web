@@ -26,15 +26,8 @@ pub async fn approve_pr(
     pr: u64,
     method: Option<String>,
 ) -> status::Custom<(ContentType, String)> {
-    let ctx = match context::resolve(
-        cookies,
-        catalog,
-        app_auth,
-        tokens,
-        github_client,
-        &language,
-    )
-    .await
+    let ctx = match context::resolve(cookies, catalog, app_auth, tokens, github_client, &language)
+        .await
     {
         Ok(c) => c,
         Err(resp) => return resp,

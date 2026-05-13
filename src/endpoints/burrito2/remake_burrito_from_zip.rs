@@ -1,5 +1,5 @@
-use crate::structs::AppSettings;
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, os_slash_str};
 use crate::utils::response::{
@@ -167,7 +167,13 @@ pub async fn remake_burrito_from_zip(
         let unpack_path = unpack_dir.path().to_path_buf();
 
         // 2. Unpack zip INTO TEMP DIR (NOT repo)
-        match unpack_zip_file(named_temp, unpack_path.to_string_lossy().to_string(), Some(1)).await {
+        match unpack_zip_file(
+            named_temp,
+            unpack_path.to_string_lossy().to_string(),
+            Some(1),
+        )
+        .await
+        {
             Ok(_) => (),
             Err(e) => {
                 return not_ok_json_response(

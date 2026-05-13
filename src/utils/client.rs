@@ -1,5 +1,5 @@
-use std::sync::Mutex;
 use crate::structs::{Client, PublicClient};
+use std::sync::Mutex;
 
 pub(crate) fn public_serialize_client(c: Client) -> PublicClient {
     PublicClient {

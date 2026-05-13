@@ -69,9 +69,7 @@ pub async fn push_repo(
         if cred_type == "https" {
             let user = username.unwrap_or_default();
             let pass = pass_key.unwrap_or_default();
-            remote_callbacks.credentials(move |_, _, _| {
-                Cred::userpass_plaintext(&user, &pass)
-            });
+            remote_callbacks.credentials(move |_, _, _| Cred::userpass_plaintext(&user, &pass));
         } else {
             remote_callbacks.credentials(move |_, user_from_url, _| {
                 let system_user = "git".to_string();

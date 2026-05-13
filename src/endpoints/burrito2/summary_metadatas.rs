@@ -1,5 +1,5 @@
-use crate::structs::AppSettings;
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::structs::MetadataSummary;
 use crate::utils::burrito::summary_metadata_from_file;
 use crate::utils::paths::os_slash_str;
@@ -29,7 +29,10 @@ pub fn summary_metadatas(
         let uw_server_path_ob2 = uw_server_path_ob.clone();
         let server_leaf = uw_server_path_ob2.file_name().unwrap();
         if server_leaf.to_str().unwrap().starts_with(".") {
-            println!("Skipping server . file or dir {}", &server_leaf.to_str().unwrap());
+            println!(
+                "Skipping server . file or dir {}",
+                &server_leaf.to_str().unwrap()
+            );
             continue;
         }
         if !std::path::Path::new(&uw_server_path_ob).is_dir() {
@@ -55,8 +58,12 @@ pub fn summary_metadatas(
                     if server_org == "_local_/_quarantine_" {
                         continue;
                     }
-                    if server_org == "_local_/_archive_" {continue};
-                    if server_org == "_local_/_updates_" {continue};
+                    if server_org == "_local_/_archive_" {
+                        continue;
+                    };
+                    if server_org == "_local_/_updates_" {
+                        continue;
+                    };
                 }
             }
             if org_leaf.to_str().unwrap().starts_with(".") {
@@ -77,7 +84,10 @@ pub fn summary_metadatas(
                     repo_leaf.to_str().unwrap()
                 );
                 if repo_leaf.to_str().unwrap().starts_with(".") {
-                    println!("Skipping repo . file or dir {}", &repo_leaf.to_str().unwrap());
+                    println!(
+                        "Skipping repo . file or dir {}",
+                        &repo_leaf.to_str().unwrap()
+                    );
                     continue;
                 }
                 if !std::path::Path::new(&uw_repo_path_ob).is_dir() {
@@ -103,7 +113,7 @@ pub fn summary_metadatas(
                         language_name: "?".to_string(),
                         script_direction: "?".to_string(),
                         book_codes: vec![],
-                        timestamp: 0
+                        timestamp: 0,
                     });
                 repos.insert(repo_url_string, summary);
             }

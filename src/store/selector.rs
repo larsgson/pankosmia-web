@@ -26,9 +26,8 @@ pub fn build_project_store(
     {
         "fs" => Arc::new(FsLanguageStore::new(workspace_root)),
         "github" => {
-            let registry = catalog.expect(
-                "STORAGE_BACKEND=github requires a CatalogRegistry; pass Some(...)",
-            );
+            let registry =
+                catalog.expect("STORAGE_BACKEND=github requires a CatalogRegistry; pass Some(...)");
             Arc::new(GitHubLanguageStore::new(workspace_root, registry))
         }
         other => panic!("unknown STORAGE_BACKEND={}", other),

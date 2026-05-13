@@ -38,7 +38,9 @@ pub fn get_version(state: &State<AppSettings>) -> status::Custom<(ContentType, S
             let entry_string = entry.unwrap().path().display().to_string();
             if Path::new(&entry_string).is_file() {
                 let truncate_prefix = format!("{}/", path_to_walk.clone().replace("\\", "/"));
-                let truncated_entry_string = entry_string.replace("\\", "/").replace(&truncate_prefix, "");
+                let truncated_entry_string = entry_string
+                    .replace("\\", "/")
+                    .replace(&truncate_prefix, "");
                 product_resources.push(truncated_entry_string.clone());
             }
         }

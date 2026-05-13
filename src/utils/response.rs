@@ -16,7 +16,13 @@ pub(crate) fn json_payload_response(
     content: Value,
 ) -> status::Custom<(ContentType, String)> {
     let ok_content = json!({"is_good": status_code == Status::Ok, "payload": content});
-    status::Custom(status_code, (ContentType::JSON, serde_json::to_string(&ok_content).unwrap()))
+    status::Custom(
+        status_code,
+        (
+            ContentType::JSON,
+            serde_json::to_string(&ok_content).unwrap(),
+        ),
+    )
 }
 
 pub(crate) fn ok_json_response(content: String) -> status::Custom<(ContentType, String)> {

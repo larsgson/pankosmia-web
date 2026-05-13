@@ -92,11 +92,7 @@ impl TokenStore {
             .join("token.bin")
     }
 
-    pub fn save(
-        &self,
-        github_user_id: i64,
-        access_token: &str,
-    ) -> Result<(), TokenStoreError> {
+    pub fn save(&self, github_user_id: i64, access_token: &str) -> Result<(), TokenStoreError> {
         let nonce_bytes = random_nonce();
         let nonce = Nonce::from_slice(&nonce_bytes);
         let ciphertext = self
@@ -148,16 +144,16 @@ impl TokenStore {
 }
 
 fn random_key() -> [u8; 32] {
-    use aes_gcm::aead::OsRng;
     use aes_gcm::aead::rand_core::RngCore;
+    use aes_gcm::aead::OsRng;
     let mut key = [0u8; 32];
     OsRng.fill_bytes(&mut key);
     key
 }
 
 fn random_nonce() -> [u8; 12] {
-    use aes_gcm::aead::OsRng;
     use aes_gcm::aead::rand_core::RngCore;
+    use aes_gcm::aead::OsRng;
     let mut nonce = [0u8; 12];
     OsRng.fill_bytes(&mut nonce);
     nonce

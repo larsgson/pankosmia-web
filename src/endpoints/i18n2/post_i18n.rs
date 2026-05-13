@@ -1,6 +1,6 @@
 use crate::static_vars::I18N_UPDATE_COUNT;
 use crate::structs::AppSettings;
-use crate::utils::json_responses::{make_bad_json_data_response};
+use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::os_slash_str;
 use crate::utils::response::{not_ok_json_response, ok_ok_json_response};
 use rocket::http::{ContentType, Status};

@@ -487,6 +487,30 @@ await authedFetch(
 Zip security: `..` traversal and symlink entries are rejected;
 empty zips return 400.
 
+### `POST /burrito/metadata/remake-ingredients/<repo>`
+
+Regenerate `metadata.json`'s `ingredients` map from the working-
+branch tree under `ingredients/`. Single-file commit (only
+`metadata.json` is written).
+
+```js
+await authedFetch(
+  `${API_BASE}/burrito/metadata/remake-ingredients/x/y/z`,
+  { method: 'POST' }
+).then(r => r.json());
+// { is_good: true, status: "regenerated",
+//   ingredient_count: N, added_count: A, removed_count: R,
+//   written_paths: ["metadata.json"], file_count: 1,
+//   total_bytes: M, branch, pr_url, pr_number }
+```
+
+**Checksum-format note.** The per-ingredient `checksum` field is
+`{ "sha1": "<git-blob-sha1>" }` in GitHub mode — taken directly
+from GitHub's tree response. This is a documented behaviour delta
+from FS mode (which uses `{"md5": "..."}`); the trade-off avoids
+per-blob downloads that an md5 strategy would require. Clients
+inspecting the checksum should accept either shape.
+
 ### `POST /burrito/zipped/<repo>`
 
 Replace the entire burrito (no `base_tree`) with the contents of
@@ -703,6 +727,7 @@ Write — bulk (atomic multi-file commit; same auth + caps in §7c):
 | `/burrito/ingredients/delete/<repo>?ipath=<prefix>` | POST | Atomic recursive delete under `ingredients/<prefix>` |
 | `/burrito/ingredient/zipped/<repo>?ipath=<prefix>` | POST | Zip import under `ingredients/<prefix>` (multipart `file`) |
 | `/burrito/zipped/<repo>` | POST | Replace entire burrito from zip (multipart `file`) |
+| `/burrito/metadata/remake-ingredients/<repo>` | POST | Regenerate `metadata.json` from current tree (checksum uses git blob sha1 in GitHub mode) |
 
 Auth (GitHub mode only):
 
@@ -746,14 +771,6 @@ silently):
 ---
 
 ## 14. Not yet implemented (in GitHub mode)
-
-Returns 501 with a clear `reason`:
-
-- `POST /burrito/metadata/remake-ingredients/<repo>` — regenerate
-  metadata from the ingredients listing. Needs a checksum strategy
-  (the Scripture Burrito spec calls for md5, which would require
-  per-blob downloads; alternatives: use the git blob sha, or accept
-  the bandwidth cost). Decision deferred.
 
 Not yet wired at all:
 

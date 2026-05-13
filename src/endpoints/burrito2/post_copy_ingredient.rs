@@ -89,7 +89,9 @@ pub async fn copy_ingredient(
         if !std::path::Path::new(&full_src_path).is_file() {
             return not_ok_json_response(
                 Status::BadRequest,
-                make_bad_json_data_response("Source ingredient not found or not a file".to_string()),
+                make_bad_json_data_response(
+                    "Source ingredient not found or not a file".to_string(),
+                ),
             );
         }
         let full_target_path = format!(
@@ -106,7 +108,7 @@ pub async fn copy_ingredient(
             return not_ok_json_response(
                 Status::BadRequest,
                 make_bad_json_data_response("src and target must be different".to_string()),
-            )
+            );
         }
         // Make subdirs if necessary
         let target_parent = destination_parent(full_target_path.clone());
@@ -143,19 +145,23 @@ pub async fn copy_ingredient(
             Err(e) => {
                 return not_ok_json_response(
                     Status::BadRequest,
-                    make_bad_json_data_response(format!("could not copy ingredient: {}", e).to_string()),
+                    make_bad_json_data_response(
+                        format!("could not copy ingredient: {}", e).to_string(),
+                    ),
                 )
             }
         }
         // Maybe delete src ingredient
         match delete_src {
-            Some(true) => {
-                match std::fs::remove_file(full_src_path) {
-                    Ok(_) => { },
-                    Err(e) => return not_ok_json_response(
+            Some(true) => match std::fs::remove_file(full_src_path) {
+                Ok(_) => {}
+                Err(e) => {
+                    return not_ok_json_response(
                         Status::BadRequest,
-                        make_bad_json_data_response(format!("could not delete src ingredient: {}", e).to_string()),
-                    ),
+                        make_bad_json_data_response(
+                            format!("could not delete src ingredient: {}", e).to_string(),
+                        ),
+                    )
                 }
             },
             _ => {}

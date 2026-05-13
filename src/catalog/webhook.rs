@@ -19,10 +19,12 @@ use rocket::request::{FromRequest, Outcome, Request};
 use rocket::response::status;
 use rocket::{post, State};
 
+use crate::catalog::{CatalogRegistry, SharedCatalogSync};
 use crate::identity::LanguageCode;
 use crate::store::SharedProjectStore;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::response::{not_ok_json_response, ok_json_response};
+use std::sync::Arc;
 
 /// Signature header value, captured by a request guard.
 pub struct GithubSignature(pub String);
@@ -105,6 +107,8 @@ impl WebhookSecret {
 pub async fn catalog_webhook(
     sig: GithubSignature,
     secret: &State<WebhookSecret>,
+    catalog: &State<Arc<CatalogRegistry>>,
+    sync: &State<SharedCatalogSync>,
     body: Data<'_>,
 ) -> status::Custom<(ContentType, String)> {
     if secret.is_empty() {
@@ -134,8 +138,18 @@ pub async fn catalog_webhook(
             make_bad_json_data_response("signature mismatch".into()),
         );
     }
-    // The actual fetch + reload is wired in lib.rs / catalog
-    // refresh task (G2 integration glue).
+    // Refresh the catalog in the background so we can return 200
+    // quickly. git2 + file IO runs on the blocking pool.
+    let catalog_clone = catalog.inner().clone();
+    let sync_clone = sync.inner().clone();
+    tokio::task::spawn_blocking(move || match sync_clone.refresh(&catalog_clone) {
+        Ok(diff) => println!(
+            "catalog webhook: reloaded ({} added, {} removed)",
+            diff.added.len(),
+            diff.removed.len()
+        ),
+        Err(e) => eprintln!("catalog webhook: refresh failed: {}", e),
+    });
     ok_json_response(r#"{"is_good":true,"reason":"queued"}"#.into())
 }
 
@@ -215,8 +229,7 @@ mod tests {
         let body = b"hello";
         // Pre-computed sha256 hmac of "hello" with key "test-secret":
         // openssl: echo -n "hello" | openssl dgst -sha256 -hmac "test-secret"
-        let header =
-            "sha256=bcc889a40667cab715e1dc22ad280692cf4bf1c3a280eeeca60d8dbcd8e4b993";
+        let header = "sha256=bcc889a40667cab715e1dc22ad280692cf4bf1c3a280eeeca60d8dbcd8e4b993";
         assert!(verify_signature(secret, body, header));
     }
 

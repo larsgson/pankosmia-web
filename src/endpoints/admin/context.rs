@@ -60,10 +60,7 @@ pub async fn resolve(
     let entry = catalog.get(&lang).ok_or_else(|| {
         not_ok_json_response(
             Status::NotFound,
-            make_bad_json_data_response(format!(
-                "language '{}' not in catalog",
-                language_code
-            )),
+            make_bad_json_data_response(format!("language '{}' not in catalog", language_code)),
         )
     })?;
     let upstream = entry.repo.clone();
@@ -75,8 +72,10 @@ pub async fn resolve(
                 make_bad_json_data_response(format!("{}", e)),
             )
         })?;
-    let installation_token =
-        app_auth.installation_token(installation_id).await.map_err(|e| {
+    let installation_token = app_auth
+        .installation_token(installation_id)
+        .await
+        .map_err(|e| {
             not_ok_json_response(
                 Status::BadGateway,
                 make_bad_json_data_response(format!("installation token: {}", e)),
@@ -118,7 +117,10 @@ pub async fn resolve(
                 make_bad_json_data_response(format!("collaborator permission: {}", e)),
             )
         })?;
-    let perm_str = permission.as_ref().map(|p| p.permission.as_str()).unwrap_or("none");
+    let perm_str = permission
+        .as_ref()
+        .map(|p| p.permission.as_str())
+        .unwrap_or("none");
     if !ADMIN_PERMISSIONS.contains(&perm_str) {
         return Err(not_ok_json_response(
             Status::Forbidden,

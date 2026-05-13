@@ -1,9 +1,9 @@
 use crate::static_vars::NET_IS_ENABLED;
+use crate::structs::RemoteRepoRecord;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::response::{
     not_ok_json_response, not_ok_offline_json_response, ok_json_response,
 };
-use crate::structs::RemoteRepoRecord;
 use rocket::get;
 use rocket::http::{ContentType, Status};
 use rocket::response::status;
@@ -84,13 +84,13 @@ pub fn gitea_user_remote_repos(
                                 },
                                 _ => "".to_string(),
                             },
-                            _ => "".to_string()
+                            _ => "".to_string(),
                         },
                         metadata_types: match json_record["metadata_type"].as_str() {
                             Some(s) => s.to_string(),
                             None => "".to_string(),
                         },
-                     topics: match json_record["topics"].as_array() {
+                        topics: match json_record["topics"].as_array() {
                             Some(s) => s
                                 .to_vec()
                                 .into_iter()
@@ -104,11 +104,13 @@ pub fn gitea_user_remote_repos(
                             Some(s) => s
                                 .to_vec()
                                 .into_iter()
-                                .filter(|e| e.as_object().expect("object in ingredients filter")["exists"].as_bool().expect("exists bool"))
+                                .filter(|e| {
+                                    e.as_object().expect("object in ingredients filter")["exists"]
+                                        .as_bool()
+                                        .expect("exists bool")
+                                })
                                 .map(|e: Value| -> String {
-                                    e.as_object()
-                                        .expect("object in ingredients")
-                                        ["identifier"]
+                                    e.as_object().expect("object in ingredients")["identifier"]
                                         .as_str()
                                         .expect("identifier to str")
                                         .to_string()
@@ -116,11 +118,12 @@ pub fn gitea_user_remote_repos(
                                 .collect(),
                             None => Vec::new(),
                         },
-                        parent_clone_url: match json_record["parent"].as_object(){
+                        parent_clone_url: match json_record["parent"].as_object() {
                             Some(ob1) => match ob1["html_url"].as_str() {
-                                 Some(s) => s.to_string(),
-                                    _=> "".to_string(),
-                            } _ => "".to_string(),
+                                Some(s) => s.to_string(),
+                                _ => "".to_string(),
+                            },
+                            _ => "".to_string(),
                         },
                     });
                 }

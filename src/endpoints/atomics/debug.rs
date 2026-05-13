@@ -52,4 +52,3 @@ pub fn debug_disable(msgs: &State<MsgQueue>) -> status::Custom<(ContentType, Str
     DEBUG_IS_ENABLED.store(false, Ordering::Relaxed);
     ok_ok_json_response()
 }
-

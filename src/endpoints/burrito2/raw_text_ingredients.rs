@@ -1,12 +1,14 @@
-use std::collections::BTreeMap;
-use crate::structs::AppSettings;
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, check_path_string_components, os_slash_str};
-use crate::utils::response::{not_ok_json_response, not_ok_bad_repo_json_response, ok_json_response};
+use crate::utils::response::{
+    not_ok_bad_repo_json_response, not_ok_json_response, ok_json_response,
+};
 use rocket::http::{ContentType, Status};
 use rocket::response::status;
 use rocket::{get, State};
+use std::collections::BTreeMap;
 use std::path::{Components, PathBuf};
 
 /// *`GET /ingredients/raw/<repo_path>?ipath=my_burrito_path`*
@@ -42,19 +44,23 @@ pub async fn raw_text_ingredients(
                         match std::fs::read_to_string(&path) {
                             Ok(fc) => {
                                 files.insert(format!("{}", file_name.to_str().unwrap()), fc);
-                            },
-                            Err(e) => return not_ok_json_response(
+                            }
+                            Err(e) => {
+                                return not_ok_json_response(
                                     Status::BadRequest,
-                                make_bad_json_data_response(
-                                    format!("could not read ingredient file {:?}: {}", file_name, e).to_string(),
-                                ),
-                            )
+                                    make_bad_json_data_response(
+                                        format!(
+                                            "could not read ingredient file {:?}: {}",
+                                            file_name, e
+                                        )
+                                        .to_string(),
+                                    ),
+                                )
+                            }
                         };
                     }
                 }
-                ok_json_response(
-                    serde_json::to_string(&files).expect("map to string")
-                )
+                ok_json_response(serde_json::to_string(&files).expect("map to string"))
             }
             Err(e) => not_ok_json_response(
                 Status::BadRequest,

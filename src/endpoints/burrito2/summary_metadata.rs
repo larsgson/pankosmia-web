@@ -1,15 +1,15 @@
-use rocket::http::{ContentType, Status};
-use rocket::response::status;
-use rocket::{get, State};
-use std::path::{Components, PathBuf};
-use crate::structs::{AppSettings, MetadataSummary};
 use crate::store::SharedProjectStore;
+use crate::structs::{AppSettings, MetadataSummary};
+use crate::utils::burrito::summary_metadata_from_file;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, os_slash_str};
 use crate::utils::response::{
     not_ok_bad_repo_json_response, not_ok_json_response, ok_json_response,
 };
-use crate::utils::burrito::summary_metadata_from_file;
+use rocket::http::{ContentType, Status};
+use rocket::response::status;
+use rocket::{get, State};
+use std::path::{Components, PathBuf};
 
 /// *`GET /metadata/summary/<repo_path>`*
 ///
@@ -45,19 +45,20 @@ pub async fn summary_metadata(
             &repo_path.display().to_string(),
             os_slash_str()
         );
-        let summary = summary_metadata_from_file(path_to_serve).unwrap_or_else(|_| MetadataSummary {
-            name: "? Bad Metadata JSON ?".to_string(),
-            description: "?".to_string(),
-            abbreviation: "?".to_string(),
-            generated_date: "?".to_string(),
-            flavor_type: "?".to_string(),
-            flavor: "?".to_string(),
-            language_code: "?".to_string(),
-            language_name: "?".to_string(),
-            script_direction: "?".to_string(),
-            book_codes: vec![],
-            timestamp: 0
-        });
+        let summary =
+            summary_metadata_from_file(path_to_serve).unwrap_or_else(|_| MetadataSummary {
+                name: "? Bad Metadata JSON ?".to_string(),
+                description: "?".to_string(),
+                abbreviation: "?".to_string(),
+                generated_date: "?".to_string(),
+                flavor_type: "?".to_string(),
+                flavor: "?".to_string(),
+                language_code: "?".to_string(),
+                language_name: "?".to_string(),
+                script_direction: "?".to_string(),
+                book_codes: vec![],
+                timestamp: 0,
+            });
         match serde_json::to_string(&summary) {
             Ok(v) => ok_json_response(v),
             Err(e) => not_ok_json_response(

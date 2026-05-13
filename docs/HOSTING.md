@@ -50,7 +50,12 @@ ROCKET_SECRET_KEY=$(openssl rand -base64 32)                 # cookie signing
 
 # Server
 PANKOSMIA_PUBLIC_ORIGIN=https://example.com                  # for OAuth callback URL
-PANKOSMIA_CATALOG_PATH=/data/.pankosmia/catalog/languages.yaml
+
+# Catalog source — pick ONE:
+PANKOSMIA_CATALOG_REPO=larsgson/pankosmia-catalog            # github repo owner/name; server clones + refreshes
+# OR a local file path (used when CATALOG_REPO is unset; baked default is /app/catalog/languages.yaml):
+# PANKOSMIA_CATALOG_PATH=/data/catalog/languages.yaml
+
 ROCKET_ADDRESS=0.0.0.0
 ROCKET_PORT=19119
 ```
@@ -58,7 +63,8 @@ ROCKET_PORT=19119
 Optional:
 
 ```bash
-PANKOSMIA_PERIODIC_FETCH_INTERVAL_SECS=900   # background language-cache refresh; default 900 = 15 min; 0 disables
+PANKOSMIA_CATALOG_BRANCH=main                # branch to track when CATALOG_REPO is set; default main
+PANKOSMIA_PERIODIC_FETCH_INTERVAL_SECS=900   # background catalog + language-cache refresh; default 900 = 15 min; 0 disables
 
 # Audio reference validation. Writes to audio_content/**/ref.json (or
 # any .audioref) are validated against the v1 schema and license

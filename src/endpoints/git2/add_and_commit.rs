@@ -68,8 +68,8 @@ pub async fn add_and_commit(
     // The closure owns its inputs so the future can be `'static`.
     let result = pools
         .run_git(move || -> Result<(), String> {
-            let repo = Repository::open(&repo_path_string)
-                .map_err(|e| format!("open repo: {}", e))?;
+            let repo =
+                Repository::open(&repo_path_string).map_err(|e| format!("open repo: {}", e))?;
             let mut index = repo.index().map_err(|e| format!("repo index: {}", e))?;
             index
                 .add_all(&["."], git2::IndexAddOption::DEFAULT, None)
@@ -78,9 +78,7 @@ pub async fn add_and_commit(
             let oid = index
                 .write_tree()
                 .map_err(|e| format!("write_tree: {}", e))?;
-            let signature = repo
-                .signature()
-                .map_err(|e| format!("signature: {}", e))?;
+            let signature = repo.signature().map_err(|e| format!("signature: {}", e))?;
             let parent_commit = repo
                 .head()
                 .and_then(|h| h.peel_to_commit())

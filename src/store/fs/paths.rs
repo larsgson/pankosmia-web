@@ -148,8 +148,15 @@ mod tests {
     #[test]
     fn validate_segment_rejects_traversal_payloads() {
         for bad in [
-            "..", ".", "/etc/passwd", "..\\..\\windows", "foo/bar", "foo\\bar",
-            "foo\0bar", "/leading", "\\leading",
+            "..",
+            ".",
+            "/etc/passwd",
+            "..\\..\\windows",
+            "foo/bar",
+            "foo\\bar",
+            "foo\0bar",
+            "/leading",
+            "\\leading",
         ] {
             assert!(
                 validate_segment(bad).is_err(),
@@ -180,7 +187,10 @@ mod tests {
         let root = std::path::PathBuf::from("/tmp/test");
         let p = legacy_repo_workspace_path(&root, std::path::Path::new("_local_/_local_/myrepo"))
             .unwrap();
-        assert_eq!(p, std::path::PathBuf::from("/tmp/test/_local_/_local_/myrepo"));
+        assert_eq!(
+            p,
+            std::path::PathBuf::from("/tmp/test/_local_/_local_/myrepo")
+        );
     }
 
     #[test]
@@ -195,6 +205,8 @@ mod tests {
     #[test]
     fn legacy_repo_workspace_path_rejects_reserved_prefix() {
         let root = std::path::PathBuf::from("/tmp/test");
-        assert!(legacy_repo_workspace_path(&root, std::path::Path::new(".pankosmia/sneak")).is_err());
+        assert!(
+            legacy_repo_workspace_path(&root, std::path::Path::new(".pankosmia/sneak")).is_err()
+        );
     }
 }

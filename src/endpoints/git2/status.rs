@@ -49,19 +49,28 @@ pub async fn git_status(
             if s.contains(git2::Status::IGNORED) {
                 continue;
             }
-            let change_type = if s.contains(git2::Status::INDEX_NEW) || s.contains(git2::Status::WT_NEW) {
-                "new"
-            } else if s.contains(git2::Status::INDEX_MODIFIED) || s.contains(git2::Status::WT_MODIFIED) {
-                "modified"
-            } else if s.contains(git2::Status::INDEX_DELETED) || s.contains(git2::Status::WT_DELETED) {
-                "deleted"
-            } else if s.contains(git2::Status::INDEX_RENAMED) || s.contains(git2::Status::WT_RENAMED) {
-                "renamed"
-            } else if s.contains(git2::Status::INDEX_TYPECHANGE) || s.contains(git2::Status::WT_TYPECHANGE) {
-                "type_change"
-            } else {
-                ""
-            };
+            let change_type =
+                if s.contains(git2::Status::INDEX_NEW) || s.contains(git2::Status::WT_NEW) {
+                    "new"
+                } else if s.contains(git2::Status::INDEX_MODIFIED)
+                    || s.contains(git2::Status::WT_MODIFIED)
+                {
+                    "modified"
+                } else if s.contains(git2::Status::INDEX_DELETED)
+                    || s.contains(git2::Status::WT_DELETED)
+                {
+                    "deleted"
+                } else if s.contains(git2::Status::INDEX_RENAMED)
+                    || s.contains(git2::Status::WT_RENAMED)
+                {
+                    "renamed"
+                } else if s.contains(git2::Status::INDEX_TYPECHANGE)
+                    || s.contains(git2::Status::WT_TYPECHANGE)
+                {
+                    "type_change"
+                } else {
+                    ""
+                };
             status_changes.push(GitStatusRecord {
                 path: entry.path().unwrap_or("").to_string(),
                 change_type: change_type.to_string(),

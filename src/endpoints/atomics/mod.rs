@@ -1,2 +1,2 @@
-pub mod net;
 pub mod debug;
+pub mod net;

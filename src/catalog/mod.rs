@@ -14,8 +14,10 @@
 
 pub mod registry;
 pub mod schema;
+pub mod sync;
 pub mod webhook;
 
 pub use registry::{CatalogRegistry, RegisteredLanguage, RegistryDiff};
 pub use schema::{CatalogFile, CatalogParseError};
+pub use sync::{CatalogSync, CatalogSyncError, SharedCatalogSync};
 pub use webhook::{catalog_webhook, language_webhook, verify_signature, WebhookSecret};

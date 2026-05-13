@@ -87,10 +87,8 @@ impl CatalogRegistry {
         let old = std::mem::replace(&mut *w, new_map);
         let new_codes: std::collections::HashSet<_> = w.keys().cloned().collect();
         let old_codes: std::collections::HashSet<_> = old.keys().cloned().collect();
-        let added: Vec<LanguageCode> =
-            new_codes.difference(&old_codes).cloned().collect();
-        let removed: Vec<LanguageCode> =
-            old_codes.difference(&new_codes).cloned().collect();
+        let added: Vec<LanguageCode> = new_codes.difference(&old_codes).cloned().collect();
+        let removed: Vec<LanguageCode> = old_codes.difference(&new_codes).cloned().collect();
         Ok(RegistryDiff { added, removed })
     }
 

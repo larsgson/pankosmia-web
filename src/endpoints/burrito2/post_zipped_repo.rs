@@ -181,18 +181,24 @@ pub async fn post_zipped_repo(
             if (path_n == 0) && (path_string != "_local_".to_string()) {
                 return not_ok_json_response(
                     Status::BadRequest,
-                    make_bad_json_data_response(format!("First repo path component must be '_local_' not '{}'", &path_string)),
+                    make_bad_json_data_response(format!(
+                        "First repo path component must be '_local_' not '{}'",
+                        &path_string
+                    )),
                 );
             }
             if (path_n == 1) && (path_string != "_sideloaded_".to_string()) {
                 return not_ok_json_response(
                     Status::BadRequest,
-                    make_bad_json_data_response(format!("Second repo path component must be '_sideloaded_' not '{}'", &path_string)),
+                    make_bad_json_data_response(format!(
+                        "Second repo path component must be '_sideloaded_' not '{}'",
+                        &path_string
+                    )),
                 );
             }
             path_n += 1;
-        };
-    if Path::new(&full_repo_path).exists() {
+        }
+        if Path::new(&full_repo_path).exists() {
             return not_ok_json_response(
                 Status::BadRequest,
                 make_bad_json_data_response(format!("Repo already exists")),
@@ -207,7 +213,7 @@ pub async fn post_zipped_repo(
             return not_ok_json_response(
                 Status::BadRequest,
                 make_bad_json_data_response("Zip does not look like a burrito".to_string()),
-            )
+            );
         }
 
         match std::fs::create_dir_all(&full_repo_path) {
@@ -221,7 +227,7 @@ pub async fn post_zipped_repo(
         }
 
         // Unpack zip
-        match unpack_zip_file(file_path, full_repo_path,None).await {
+        match unpack_zip_file(file_path, full_repo_path, None).await {
             Ok(_) => ok_ok_json_response(),
             Err(e) => not_ok_json_response(
                 Status::InternalServerError,

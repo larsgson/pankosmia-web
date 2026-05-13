@@ -1,5 +1,5 @@
-use crate::structs::AppSettings;
 use crate::store::SharedProjectStore;
+use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, os_slash_str};
 use crate::utils::response::{
@@ -66,11 +66,11 @@ pub fn obs_story_video(
         }
         let first_para = match json_form.from_para_n {
             Some(n) => n,
-            None => 0
+            None => 0,
         };
         let last_para = match json_form.to_para_n {
             Some(n) => n,
-            None => 50
+            None => 50,
         };
         // println!("Story {}, para(s) {}-{}", json_form.story_n, first_para, last_para);
 
@@ -89,7 +89,13 @@ pub fn obs_story_video(
                     Ok(n) => n,
                     Err(_) => continue,
                 };
-                let para_n = match file_name.split("-").nth(3).unwrap().replace(".mp4", "").parse::<i32>() {
+                let para_n = match file_name
+                    .split("-")
+                    .nth(3)
+                    .unwrap()
+                    .replace(".mp4", "")
+                    .parse::<i32>()
+                {
                     Ok(n) => n,
                     Err(_) => continue,
                 };
@@ -105,37 +111,43 @@ pub fn obs_story_video(
                 video_map.insert(para_n, path);
             }
         }
-        
-		// Ajouter les inputs en arguments
-		let mut args: Vec<String> = Vec::new();
+
+        // Ajouter les inputs en arguments
+        let mut args: Vec<String> = Vec::new();
         let mut concat_args = String::new();
-		for (para_n, path) in video_map.iter() {
-			args.push("-i".to_string());
-			args.push(path.display().to_string());
-            concat_args.push_str(format!("[{}:v][{}:a]", para_n-1, para_n-1).as_str());
-		}
-		args.push("-filter_complex".to_string());
-		args.push(format!("{}concat=n={}:v=1:a=1[v][a]", concat_args, video_map.len()));
+        for (para_n, path) in video_map.iter() {
+            args.push("-i".to_string());
+            args.push(path.display().to_string());
+            concat_args.push_str(format!("[{}:v][{}:a]", para_n - 1, para_n - 1).as_str());
+        }
+        args.push("-filter_complex".to_string());
+        args.push(format!(
+            "{}concat=n={}:v=1:a=1[v][a]",
+            concat_args,
+            video_map.len()
+        ));
         args.push("-map".to_string());
         args.push("[v]".to_string());
         args.push("-map".to_string());
         args.push("[a]".to_string());
-		let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-		println!("Args: {:?}", args);
+        let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        println!("Args: {:?}", args);
 
         // // Créer la vidéo finale
         let video_path = format!("{}/obs-story-{}.mp4", video_content_path, json_form.story_n);
         let video_writer = FfmpegCommand::new()
             .overwrite()
-			.args(args_refs)
+            .args(args_refs)
             .codec_video("libx264")
             .codec_audio("aac")
             .output(video_path)
-            .spawn().unwrap()
-            .iter().unwrap();
+            .spawn()
+            .unwrap()
+            .iter()
+            .unwrap();
 
         video_writer.for_each(|_| {});
-        
+
         ok_ok_json_response()
     } else {
         not_ok_bad_repo_json_response()

@@ -55,9 +55,9 @@ pub struct RagResponse {
 /// Typically mounted as **`/llm/rag-prompt`**
 ///
 /// Builds a RAG prompt, processes it and returns the result
-/// 
+///
 /// Request JSON
-/// 
+///
 /// {
 ///  "model_name": "qwen3-4b",
 ///  "quantized": true,
@@ -86,7 +86,7 @@ pub struct RagResponse {
 ///       ]
 ///     }
 ///   },
-/// 
+///
 /// *Response JSON*
 /// {
 ///   "submitted": 1771843000.0,
@@ -130,10 +130,10 @@ pub async fn post_rag_prompt(
     let safe_field_regex = Regex::new(r"[^A-Za-z0-9._-]").unwrap();
     let safe_model_name = safe_field_regex.replace(form.model_name.as_str(), "_");
     let working_path = state.working_dir.clone();
-        let submitted = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .expect("epoch time")
-            .as_secs_f32();
+    let submitted = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("epoch time")
+        .as_secs_f32();
 
     // Check model exists
     let model_dir_path = format!(
@@ -197,15 +197,16 @@ pub async fn post_rag_prompt(
             )
         }
     };
-    let mut generator = generator_from_model(&model, &tokenizer, top_k, temperature, form.rag_context.prompts.system.clone());
+    let mut generator = generator_from_model(
+        &model,
+        &tokenizer,
+        top_k,
+        temperature,
+        form.rag_context.prompts.system.clone(),
+    );
 
     // Build reference (one verse for now)
-    let bcv = format!(
-        "{} {}:{}",
-        &form.book,
-        &form.from_chapter,
-        &form.from_verse,
-    );
+    let bcv = format!("{} {}:{}", &form.book, &form.from_chapter, &form.from_verse,);
 
     // Query model
     let now = Instant::now();

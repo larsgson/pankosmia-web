@@ -1,18 +1,21 @@
-use crate::endpoints::burrito2::github_save::is_github_backend;
+use crate::auth::{GithubAppAuth, GithubClient, LanguageHeader, TokenStore};
+use crate::catalog::CatalogRegistry;
+use crate::endpoints::burrito2::github_save::{handle_github_bulk, is_github_backend};
+use crate::server::{LanguageLocks, RateLimiter};
+use crate::store::github::BulkOp;
 use crate::store::SharedProjectStore;
 use crate::structs::{AppSettings, BurritoMetadata};
-use crate::utils::burrito::{
-    ingredients_metadata_from_files, ingredients_scopes_from_files,
-};
+use crate::utils::burrito::{ingredients_metadata_from_files, ingredients_scopes_from_files};
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::{check_path_components, os_slash_str};
 use crate::utils::response::{
     not_ok_bad_repo_json_response, not_ok_json_response, ok_ok_json_response,
 };
-use rocket::http::{ContentType, Status};
+use rocket::http::{ContentType, CookieJar, Status};
 use rocket::response::status;
 use rocket::{post, State};
 use std::path::{Components, PathBuf};
+use std::sync::Arc;
 
 /// *`POST /metadata/remake-ingredients/<repo_path>`*
 ///
@@ -22,25 +25,36 @@ use std::path::{Components, PathBuf};
 
 #[post("/metadata/remake-ingredients/<repo_path..>")]
 #[allow(irrefutable_let_patterns)]
+#[allow(clippy::too_many_arguments)]
 pub async fn remake_ingredients_metadata(
     state: &State<AppSettings>,
     store: &State<SharedProjectStore>,
+    cookies: &CookieJar<'_>,
+    catalog: &State<Arc<CatalogRegistry>>,
+    app_auth: &State<Option<GithubAppAuth>>,
+    tokens: &State<TokenStore>,
+    github_client: &State<GithubClient>,
+    locks: &State<LanguageLocks>,
+    rate_limiter: &State<RateLimiter>,
+    language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
 ) -> status::Custom<(ContentType, String)> {
     if is_github_backend() {
-        // Deferred: regenerating metadata.json requires per-ingredient
-        // checksums. The Scripture Burrito spec calls for md5, which
-        // would require downloading every blob from GitHub to hash
-        // (slow + costs API quota). The git tree response gives us
-        // each blob's sha1, but that's a different checksum and
-        // includes git's blob header. Decision deferred — see the
-        // §14 entry in docs/CLIENT_INTEGRATION.md.
-        return not_ok_json_response(
-            Status::NotImplemented,
-            make_bad_json_data_response(
-                "metadata regeneration is not yet implemented for STORAGE_BACKEND=github (checksum-strategy decision pending; see docs/CLIENT_INTEGRATION.md §14)".into(),
-            ),
-        );
+        return handle_github_bulk(
+            cookies,
+            catalog,
+            app_auth,
+            tokens,
+            github_client,
+            locks,
+            rate_limiter,
+            language_header,
+            BulkOp::RegenerateMetadata {
+                app_resources_dir: state.app_resources_dir.clone(),
+            },
+            "pankosmia: regenerate metadata.json ingredients",
+        )
+        .await;
     }
     let path_components: Components<'_> = repo_path.components();
     let full_repo_path = format!(

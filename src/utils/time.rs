@@ -1,6 +1,6 @@
-use std::time::SystemTime;
 use chrono::{DateTime, Utc};
 use regex::Regex;
+use std::time::SystemTime;
 
 pub(crate) fn utc_now_timestamp_string() -> String {
     let now = SystemTime::now();

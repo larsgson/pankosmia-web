@@ -88,10 +88,7 @@ pub async fn handle_github_op<'a>(
     if let Err(RateLimitError::Exceeded(retry_after)) = rate_limiter.check(github_user_id) {
         return not_ok_json_response(
             Status::TooManyRequests,
-            make_bad_json_data_response(format!(
-                "rate limit exceeded; retry in {}s",
-                retry_after
-            )),
+            make_bad_json_data_response(format!("rate limit exceeded; retry in {}s", retry_after)),
         );
     }
     // Size cap for any bytes the user is writing. Reverts/copies
@@ -250,8 +247,7 @@ pub fn read_zip_into_bulk_files(
 ) -> Result<Vec<crate::store::github::BulkFile>, String> {
     use crate::store::github::BulkFile;
     use std::io::Read;
-    let file = std::fs::File::open(zip_path)
-        .map_err(|e| format!("open zip: {}", e))?;
+    let file = std::fs::File::open(zip_path).map_err(|e| format!("open zip: {}", e))?;
     let mut zip = zip::ZipArchive::new(file).map_err(|e| format!("read zip: {}", e))?;
     let mut out: Vec<BulkFile> = Vec::with_capacity(zip.len());
     for i in 0..zip.len() {
@@ -316,10 +312,7 @@ pub async fn handle_github_bulk(
     if let Err(RateLimitError::Exceeded(retry_after)) = rate_limiter.check(github_user_id) {
         return not_ok_json_response(
             Status::TooManyRequests,
-            make_bad_json_data_response(format!(
-                "rate limit exceeded; retry in {}s",
-                retry_after
-            )),
+            make_bad_json_data_response(format!("rate limit exceeded; retry in {}s", retry_after)),
         );
     }
     let lang = match language_header {
@@ -400,10 +393,9 @@ pub async fn handle_github_bulk(
                 got, max
             )),
         ),
-        Err(BulkOpError::Invalid(msg)) => not_ok_json_response(
-            Status::BadRequest,
-            make_bad_json_data_response(msg),
-        ),
+        Err(BulkOpError::Invalid(msg)) => {
+            not_ok_json_response(Status::BadRequest, make_bad_json_data_response(msg))
+        }
         Err(BulkOpError::NoOp) => not_ok_json_response(
             Status::BadRequest,
             make_bad_json_data_response("nothing to do (no matching files)".into()),
@@ -436,6 +428,13 @@ fn ok_bulk_outcome_response(outcome: &BulkOutcome) -> status::Custom<(ContentTyp
     }
     if let Some(t) = outcome.total_bytes {
         body["total_bytes"] = serde_json::json!(t);
+    }
+    if let Some(extras) = &outcome.extras {
+        if let Some(obj) = body.as_object_mut() {
+            for (k, v) in extras {
+                obj.insert(k.clone(), v.clone());
+            }
+        }
     }
     ok_json_response(body.to_string())
 }

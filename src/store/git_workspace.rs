@@ -31,9 +31,5 @@ pub trait GitWorkspace: Send + Sync {
     /// handle's `path` is guaranteed to be inside the workspace root
     /// (path-traversal-validated by the implementation). May lazily
     /// clone / fetch in hosted deployments.
-    async fn working_copy(
-        &self,
-        lang: LanguageCode,
-        repo: RepoId,
-    ) -> StoreResult<WorkingCopy>;
+    async fn working_copy(&self, lang: LanguageCode, repo: RepoId) -> StoreResult<WorkingCopy>;
 }
