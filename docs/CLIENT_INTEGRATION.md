@@ -430,6 +430,96 @@ audio with `Access-Control-Allow-Origin: *`; other hosts may not.
 
 ---
 
+## 7c. Bulk operations
+
+A few save-style endpoints write many files in one atomic commit
+instead of one file per call. Under the hood they use GitHub's Git
+Data API (blob create → tree compose → commit → ref update) so the
+PR sees a single commit even when the operation touches dozens of
+files. See `docs/impl/BULK_OPS.md` for the design.
+
+### Limits
+
+Hard-coded server-side caps; exceeding any of them returns 413 or
+429 with a clear `reason`:
+
+- Max **100 files** per bulk op.
+- Max **10 MB** per single file inside a bulk op.
+- Max **25 MB** total payload.
+
+These are independent of the single-file save's 700 KB cap (§6.2);
+the single-file cap is tighter because the Contents API itself caps
+at ~1 MB, while the Git Data API path can handle larger blobs.
+
+### `POST /burrito/ingredients/delete/<repo>?ipath=<prefix>`
+
+Atomic recursive delete of every ingredient under the given prefix.
+Used by the "delete a Bible book" UI in content handlers.
+
+```js
+await authedFetch(
+  `${API_BASE}/burrito/ingredients/delete/x/y/z?ipath=${encodeURIComponent('MAT')}`,
+  { method: 'POST' }
+).then(r => r.json());
+// { is_good: true, status: "deleted", deleted_paths: [...], file_count: N,
+//   branch: "pankosmia-edit-<login>", pr_url, pr_number }
+```
+
+`ipath` is treated as a path under `ingredients/`. So
+`ipath=MAT` deletes every file matching `ingredients/MAT/*`.
+
+### `POST /burrito/ingredient/zipped/<repo>?ipath=<prefix>`
+
+Bulk-import many ingredients from a client-uploaded zip. Used by
+USFM import and similar bulk-ingest flows.
+
+```js
+const fd = new FormData();
+fd.append('file', zipBlob);
+await authedFetch(
+  `${API_BASE}/burrito/ingredient/zipped/x/y/z?ipath=${encodeURIComponent('')}`,
+  { method: 'POST', body: fd }
+).then(r => r.json());
+// { is_good: true, status: "uploaded", written_paths: [...],
+//   file_count: N, total_bytes: M, branch, pr_url, pr_number }
+```
+
+Zip security: `..` traversal and symlink entries are rejected;
+empty zips return 400.
+
+### `POST /burrito/zipped/<repo>`
+
+Replace the entire burrito (no `base_tree`) with the contents of
+the uploaded zip. Zip must contain a top-level `metadata.json` —
+otherwise 400 with a clear reason.
+
+```js
+const fd = new FormData();
+fd.append('file', zipBlob);
+await authedFetch(
+  `${API_BASE}/burrito/zipped/x/y/z`,
+  { method: 'POST', body: fd }
+).then(r => r.json());
+// { is_good: true, status: "replaced", written_paths: [...],
+//   file_count: N, total_bytes: M, branch, pr_url, pr_number }
+```
+
+### Response shape
+
+The bulk envelope extends the single-file save envelope with extras:
+
+| Field | Type | Notes |
+|---|---|---|
+| `is_good` | bool | as for single-file saves |
+| `status` | `"deleted"` / `"uploaded"` / `"replaced"` | op-specific |
+| `file_count` | integer | files affected in this op |
+| `deleted_paths` | array | (delete only) which files were removed |
+| `written_paths` | array | (upload/replace) what landed on the branch |
+| `total_bytes` | integer | (upload/replace) total bytes committed |
+| `branch`, `pr_url`, `pr_number` | as for single-file saves |
+
+---
+
 ## 8. Admin / review panel
 
 Visible to users with `admin` or `maintain` permission on the
@@ -596,15 +686,23 @@ Read / watch (no auth needed in FS mode; session in GitHub mode):
 | `/burrito/metadata/summaries` | GET | All summaries |
 | `/burrito/paths/<repo>` | GET | File listing |
 
-Write (session required + `X-Language-Code` in GitHub mode):
+Write — single file (session required + `X-Language-Code` in GitHub mode):
 
 | Endpoint | Method | Notes |
 |---|---|---|
-| `/burrito/ingredient/raw/<repo>?ipath=...` | POST | JSON body `{payload: "..."}` |
+| `/burrito/ingredient/raw/<repo>?ipath=...` | POST | JSON body `{payload: "..."}`. Also used for audio reference writes — paths matching `audio_content/**/ref.json` are schema-validated server-side (see §7b). |
 | `/burrito/ingredient/bytes/<repo>?ipath=...` | POST | multipart `file` field |
 | `/burrito/ingredient/delete/<repo>?ipath=...` | POST | Delete (FS soft / GitHub hard) |
 | `/burrito/ingredient/revert/<repo>?ipath=...` | POST | Restore previous content |
 | `/burrito/ingredient/copy/<repo>?src_path=&target_path=&delete_src=` | POST | Copy / move |
+
+Write — bulk (atomic multi-file commit; same auth + caps in §7c):
+
+| Endpoint | Method | Notes |
+|---|---|---|
+| `/burrito/ingredients/delete/<repo>?ipath=<prefix>` | POST | Atomic recursive delete under `ingredients/<prefix>` |
+| `/burrito/ingredient/zipped/<repo>?ipath=<prefix>` | POST | Zip import under `ingredients/<prefix>` (multipart `file`) |
+| `/burrito/zipped/<repo>` | POST | Replace entire burrito from zip (multipart `file`) |
 
 Auth (GitHub mode only):
 
@@ -651,15 +749,11 @@ silently):
 
 Returns 501 with a clear `reason`:
 
-- `POST /burrito/ingredients/delete/<repo>?ipath=...` — bulk
-  directory delete. Needs Git Data API for atomic multi-file commit.
 - `POST /burrito/metadata/remake-ingredients/<repo>` — regenerate
-  metadata from the ingredients listing. Needs a tree-walk via the
-  GitHub trees API.
-- `POST /burrito/ingredient/zipped/<repo>?ipath=...` — zip upload
-  → many files. Needs Git Data API.
-- `POST /burrito/zipped/<repo>` — replace the entire repo from a
-  zip. Same.
+  metadata from the ingredients listing. Needs a checksum strategy
+  (the Scripture Burrito spec calls for md5, which would require
+  per-blob downloads; alternatives: use the git blob sha, or accept
+  the bandwidth cost). Decision deferred.
 
 Not yet wired at all:
 

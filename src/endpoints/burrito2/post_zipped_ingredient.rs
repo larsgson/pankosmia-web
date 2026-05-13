@@ -1,4 +1,10 @@
-use crate::endpoints::burrito2::github_save::{is_github_backend, not_implemented_github};
+use crate::auth::{GithubAppAuth, GithubClient, LanguageHeader, TokenStore};
+use crate::catalog::CatalogRegistry;
+use crate::endpoints::burrito2::github_save::{
+    handle_github_bulk, is_github_backend, read_zip_into_bulk_files, validate_ipath_segments,
+};
+use crate::server::{LanguageLocks, RateLimiter};
+use crate::store::github::BulkOp;
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::burrito::destination_parent;
@@ -7,14 +13,15 @@ use crate::utils::paths::{check_path_components, check_path_string_components, o
 use crate::utils::response::{
     not_ok_bad_repo_json_response, not_ok_json_response, ok_ok_json_response,
 };
+use crate::utils::zip::unpack_zip_file;
 use rocket::form::{Form, FromForm};
 use rocket::fs::TempFile;
-use rocket::http::{ContentType, Status};
+use rocket::http::{ContentType, CookieJar, Status};
 use rocket::response::status;
 use rocket::{post, State};
 use std::path::{Components, PathBuf};
+use std::sync::Arc;
 use tempfile::NamedTempFile;
-use crate::utils::zip::unpack_zip_file;
 
 #[derive(FromForm)]
 pub struct Upload<'f> {
@@ -25,21 +32,85 @@ pub struct Upload<'f> {
 ///
 /// Typically mounted as **`/burrito/ingredient/zipped/<repo_path>?ipath=my_burrito_path`**
 ///
-/// Writes files or directories provided as a zip file.
+/// Writes files or directories provided as a zip file. In FS mode
+/// the zip is unpacked under `ingredients/<ipath>` on disk. In
+/// GitHub mode the zip is parsed in-memory and turned into an
+/// atomic multi-file commit via the Git Data API (see
+/// `docs/impl/BULK_OPS.md` §3.3).
 #[post(
     "/ingredient/zipped/<repo_path..>?<ipath>",
     format = "multipart/form-data",
     data = "<form>"
 )]
+#[allow(clippy::too_many_arguments)]
 pub async fn post_zipped_ingredient(
     _state: &State<AppSettings>,
     store: &State<SharedProjectStore>,
+    cookies: &CookieJar<'_>,
+    catalog: &State<Arc<CatalogRegistry>>,
+    app_auth: &State<Option<GithubAppAuth>>,
+    tokens: &State<TokenStore>,
+    github_client: &State<GithubClient>,
+    locks: &State<LanguageLocks>,
+    rate_limiter: &State<RateLimiter>,
+    language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
     ipath: String,
     mut form: Form<Upload<'_>>,
 ) -> status::Custom<(ContentType, String)> {
     if is_github_backend() {
-        return not_implemented_github("zipped multi-file upload");
+        if let Err(resp) = validate_ipath_segments(&[&ipath]) {
+            return resp;
+        }
+        let tmp = match tempfile::NamedTempFile::new() {
+            Ok(t) => t,
+            Err(e) => {
+                return not_ok_json_response(
+                    Status::InternalServerError,
+                    make_bad_json_data_response(format!("tempfile: {}", e)),
+                );
+            }
+        };
+        if let Err(e) = form.file.persist_to(tmp.path()).await {
+            return not_ok_json_response(
+                Status::InternalServerError,
+                make_bad_json_data_response(format!("persist upload: {}", e)),
+            );
+        }
+        let files = match read_zip_into_bulk_files(tmp.path()) {
+            Ok(f) => f,
+            Err(e) => {
+                return not_ok_json_response(
+                    Status::BadRequest,
+                    make_bad_json_data_response(format!("zip: {}", e)),
+                );
+            }
+        };
+        // ipath is the subdirectory under `ingredients/` where the
+        // zip's contents land.
+        let prefix = if ipath.is_empty() {
+            "ingredients".to_string()
+        } else {
+            format!("ingredients/{}", ipath.trim_end_matches('/'))
+        };
+        let commit_message = format!(
+            "pankosmia: import {} ingredients via zip into {}",
+            files.len(),
+            prefix
+        );
+        return handle_github_bulk(
+            cookies,
+            catalog,
+            app_auth,
+            tokens,
+            github_client,
+            locks,
+            rate_limiter,
+            language_header,
+            BulkOp::UploadFiles { prefix, files },
+            &commit_message,
+        )
+        .await;
     }
     let path_components: Components<'_> = repo_path.components();
     let full_repo_path =
@@ -71,7 +142,7 @@ pub async fn post_zipped_ingredient(
         form.file.move_copy_to(&file_path).await.expect("copy zip");
 
         // Unpack zip
-        match unpack_zip_file(file_path, destination,None).await {
+        match unpack_zip_file(file_path, destination, None).await {
             Ok(_) => ok_ok_json_response(),
             Err(e) => not_ok_json_response(
                 Status::InternalServerError,
@@ -79,7 +150,7 @@ pub async fn post_zipped_ingredient(
                     "Could not unpack zip archive: {}",
                     e
                 )),
-            )
+            ),
         }
     } else {
         not_ok_bad_repo_json_response()

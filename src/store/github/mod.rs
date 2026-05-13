@@ -6,9 +6,11 @@
 //! no per-user clones. See `internal-docs/AUTH_MODEL.md`.
 
 pub mod audio_ref;
+pub mod bulk_ops;
 pub mod edit_flow;
 pub mod store;
 
 pub use audio_ref::{AudioRefConfig, AudioRefError, AUDIO_REF_CONTENT_TYPE};
+pub use bulk_ops::{apply_bulk_op, BulkFile, BulkOp, BulkOpError, BulkOutcome};
 pub use edit_flow::{EditFlowError, GithubEditFlow, SaveOp, SaveOutcome};
 pub use store::GitHubLanguageStore;

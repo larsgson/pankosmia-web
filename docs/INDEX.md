@@ -28,14 +28,12 @@ next** (the implementation specs under `impl/`).
 |---|---|
 | `DECISIONS.md` | The architectural decisions that shaped the codebase. D1 (in-house vs middleware), D2 (external audio), D3 (localStorage-canonical for current phase), D4 (no client-side polyfills), D5 (PR-flow hidden from translators), D6 (catalog-canonical languages), D7 (webhooks-optional). |
 
-### Implementation specs (work to do)
+### Implementation specs
 
 | File | Implements | Effort | Status |
 |---|---|---|---|
-| `impl/AUDIO_STRATEGY.md` | External audio model (Internet Archive primary, paste-URL fallback). Server-side: validate audio reference JSON, license allowlist. | ~2 days | Ready to implement |
-| `impl/BULK_OPS.md` | The four 501 endpoints via GitHub Git Data API for atomic multi-file commits. | ~5–8 days | Ready to implement |
-
-Both are independent. Land in any order.
+| `impl/AUDIO_STRATEGY.md` | External audio model (Internet Archive primary, paste-URL fallback). Server-side: validate audio reference JSON, license allowlist. | ~2 days | **Shipped.** See `CLIENT_INTEGRATION.md` §7b. |
+| `impl/BULK_OPS.md` | The four 501 endpoints via GitHub Git Data API for atomic multi-file commits. | ~5–8 days | **3 of 4 shipped** (delete-by-prefix, zip ingest, whole-repo replace). The 4th — metadata regeneration — stays 501 pending a checksum-strategy decision. See `CLIENT_INTEGRATION.md` §7c and §14. |
 
 ### Deferred (documented but not in current scope)
 

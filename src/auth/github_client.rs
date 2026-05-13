@@ -650,6 +650,257 @@ impl GithubClient {
             .to_string();
         Ok(sha)
     }
+
+    // --- Git Data API helpers ----------------------------------------
+    //
+    // These build up an atomic multi-file commit:
+    //   1. read the current tree         (`get_tree_recursive`)
+    //   2. upload bytes as blobs         (`create_blob`)
+    //   3. compose a new tree            (`create_tree`)
+    //   4. create a commit               (`create_commit`)
+    //   5. point the branch at it        (`update_branch` already exists)
+    // Used by `store::github::bulk_ops` to implement bulk delete /
+    // zip ingest / whole-repo replace.
+
+    /// `GET /repos/{repo}/git/trees/{sha}?recursive=1` — list every
+    /// blob in a commit's tree (recursive walk).
+    ///
+    /// Returns `(entries, truncated)`. If `truncated` is true the
+    /// caller must paginate via the per-subtree API (out of scope
+    /// for our limits — we cap bulk ops at 100 files anyway).
+    pub async fn get_tree_recursive(
+        &self,
+        token: &str,
+        repo: &str,
+        tree_sha: &str,
+    ) -> Result<(Vec<GithubTreeEntry>, bool), GithubError> {
+        let url = format!(
+            "{}/repos/{}/git/trees/{}?recursive=1",
+            GITHUB_API, repo, tree_sha
+        );
+        let resp = self
+            .inner
+            .get(url)
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        map_status(&resp)?;
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GithubError::Decode(e.to_string()))?;
+        let truncated = v
+            .get("truncated")
+            .and_then(|t| t.as_bool())
+            .unwrap_or(false);
+        let entries: Vec<GithubTreeEntry> = serde_json::from_value(
+            v.get("tree").cloned().unwrap_or(serde_json::json!([])),
+        )
+        .map_err(|e| GithubError::Decode(e.to_string()))?;
+        Ok((entries, truncated))
+    }
+
+    /// `GET /repos/{repo}/git/commits/{sha}` — fetch a commit's
+    /// metadata, including its root tree sha. Used as the entry
+    /// point of a bulk op: we have the branch's commit sha, need
+    /// the tree sha to walk it.
+    pub async fn get_commit_tree_sha(
+        &self,
+        token: &str,
+        repo: &str,
+        commit_sha: &str,
+    ) -> Result<String, GithubError> {
+        let url = format!("{}/repos/{}/git/commits/{}", GITHUB_API, repo, commit_sha);
+        let resp = self
+            .inner
+            .get(url)
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        map_status(&resp)?;
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GithubError::Decode(e.to_string()))?;
+        let sha = v
+            .pointer("/tree/sha")
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| GithubError::Decode("no /tree/sha in commit response".into()))?
+            .to_string();
+        Ok(sha)
+    }
+
+    /// `POST /repos/{repo}/git/blobs` — upload bytes as a blob.
+    /// Returns the new blob's sha.
+    pub async fn create_blob(
+        &self,
+        token: &str,
+        repo: &str,
+        content: &[u8],
+    ) -> Result<String, GithubError> {
+        use base64::Engine as _;
+        #[derive(Serialize)]
+        struct Body {
+            content: String,
+            encoding: &'static str,
+        }
+        let body = Body {
+            content: base64::engine::general_purpose::STANDARD.encode(content),
+            encoding: "base64",
+        };
+        let resp = self
+            .inner
+            .post(format!("{}/repos/{}/git/blobs", GITHUB_API, repo))
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        map_status(&resp)?;
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GithubError::Decode(e.to_string()))?;
+        let sha = v
+            .get("sha")
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| GithubError::Decode("no sha in blob response".into()))?
+            .to_string();
+        Ok(sha)
+    }
+
+    /// `POST /repos/{repo}/git/trees` — compose a new tree from
+    /// (path, mode, type, sha) entries. Pass `base_tree` to derive
+    /// from an existing tree (additions/modifications are merged in,
+    /// deletions are entries with `sha: null`). Pass `None` for a
+    /// fresh tree (no inheritance from any existing tree).
+    pub async fn create_tree(
+        &self,
+        token: &str,
+        repo: &str,
+        base_tree: Option<&str>,
+        entries: &[TreeMutation<'_>],
+    ) -> Result<String, GithubError> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            base_tree: Option<&'a str>,
+            tree: Vec<TreeEntryJson<'a>>,
+        }
+        #[derive(Serialize)]
+        struct TreeEntryJson<'a> {
+            path: &'a str,
+            mode: &'a str,
+            #[serde(rename = "type")]
+            entry_type: &'a str,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            sha: Option<&'a str>,
+        }
+        let tree: Vec<TreeEntryJson> = entries
+            .iter()
+            .map(|e| TreeEntryJson {
+                path: e.path,
+                mode: e.mode,
+                entry_type: e.entry_type,
+                sha: e.sha,
+            })
+            .collect();
+        let body = Body { base_tree, tree };
+        let resp = self
+            .inner
+            .post(format!("{}/repos/{}/git/trees", GITHUB_API, repo))
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        map_status(&resp)?;
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GithubError::Decode(e.to_string()))?;
+        let sha = v
+            .get("sha")
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| GithubError::Decode("no sha in create-tree response".into()))?
+            .to_string();
+        Ok(sha)
+    }
+
+    /// `POST /repos/{repo}/git/commits` — create a commit pointing
+    /// at the given tree, with the given parents. The App is the
+    /// committer; pass the user's identity as `author` for the
+    /// commit author line.
+    pub async fn create_commit(
+        &self,
+        token: &str,
+        repo: &str,
+        message: &str,
+        tree_sha: &str,
+        parent_shas: &[&str],
+        author_name: Option<&str>,
+        author_email: Option<&str>,
+    ) -> Result<String, GithubError> {
+        #[derive(Serialize)]
+        struct Author<'a> {
+            name: &'a str,
+            email: &'a str,
+        }
+        #[derive(Serialize)]
+        struct Body<'a> {
+            message: &'a str,
+            tree: &'a str,
+            parents: &'a [&'a str],
+            #[serde(skip_serializing_if = "Option::is_none")]
+            author: Option<Author<'a>>,
+        }
+        let author = match (author_name, author_email) {
+            (Some(n), Some(e)) => Some(Author { name: n, email: e }),
+            _ => None,
+        };
+        let body = Body {
+            message,
+            tree: tree_sha,
+            parents: parent_shas,
+            author,
+        };
+        let resp = self
+            .inner
+            .post(format!("{}/repos/{}/git/commits", GITHUB_API, repo))
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| GithubError::Network(e.to_string()))?;
+        map_status(&resp)?;
+        let v: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| GithubError::Decode(e.to_string()))?;
+        let sha = v
+            .get("sha")
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| GithubError::Decode("no sha in create-commit response".into()))?
+            .to_string();
+        Ok(sha)
+    }
+}
+
+/// Lightweight description of one tree-entry mutation for
+/// `create_tree`. Deletion entries have `sha: None`; additions /
+/// modifications have `sha: Some(<blob_sha>)`.
+pub struct TreeMutation<'a> {
+    pub path: &'a str,
+    pub mode: &'a str,        // typically "100644" for files
+    pub entry_type: &'a str,  // typically "blob"
+    pub sha: Option<&'a str>, // `None` for deletion
 }
 
 fn map_status(resp: &reqwest::Response) -> Result<(), GithubError> {
@@ -734,6 +985,17 @@ pub struct GithubRef {
     #[serde(rename = "ref")]
     pub ref_: String,
     pub sha: String,
+}
+
+/// One entry in a recursive git tree listing.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GithubTreeEntry {
+    pub path: String,
+    pub mode: String,
+    #[serde(rename = "type")]
+    pub entry_type: String,
+    pub sha: Option<String>,
+    pub size: Option<u64>,
 }
 
 /// One file's changes in a PR.

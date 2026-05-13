@@ -1,4 +1,10 @@
-use crate::endpoints::burrito2::github_save::{is_github_backend, not_implemented_github};
+use crate::auth::{GithubAppAuth, GithubClient, LanguageHeader, TokenStore};
+use crate::catalog::CatalogRegistry;
+use crate::endpoints::burrito2::github_save::{
+    handle_github_bulk, is_github_backend, validate_ipath_segments,
+};
+use crate::server::{LanguageLocks, RateLimiter};
+use crate::store::github::BulkOp;
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -6,25 +12,61 @@ use crate::utils::paths::{check_path_components, check_path_string_components, o
 use crate::utils::response::{
     not_ok_bad_repo_json_response, not_ok_json_response, ok_ok_json_response,
 };
-use rocket::http::{ContentType, Status};
+use rocket::http::{ContentType, CookieJar, Status};
 use rocket::response::status;
 use rocket::{post, State};
 use std::path::{Components, PathBuf};
+use std::sync::Arc;
 
 /// *`POST /ingredients/delete/<repo_path>?ipath=my_burrito_path`*
 ///
 /// Typically mounted as **`/burrito/ingredients/delete/<repo_path>?ipath=my_burrito_path`**
 ///
-/// Deletes a directory from a repo.
+/// Deletes a directory from a repo. In FS mode this is a single
+/// `remove_dir_all`. In GitHub mode this is an atomic multi-file
+/// delete via the Git Data API (see `docs/impl/BULK_OPS.md` §3.1).
 #[post("/ingredients/delete/<repo_path..>?<ipath>")]
+#[allow(clippy::too_many_arguments)]
 pub async fn post_delete_ingredients(
     _state: &State<AppSettings>,
     store: &State<SharedProjectStore>,
+    cookies: &CookieJar<'_>,
+    catalog: &State<Arc<CatalogRegistry>>,
+    app_auth: &State<Option<GithubAppAuth>>,
+    tokens: &State<TokenStore>,
+    github_client: &State<GithubClient>,
+    locks: &State<LanguageLocks>,
+    rate_limiter: &State<RateLimiter>,
+    language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
     ipath: String,
 ) -> status::Custom<(ContentType, String)> {
     if is_github_backend() {
-        return not_implemented_github("bulk delete (directory)");
+        if let Err(resp) = validate_ipath_segments(&[&ipath]) {
+            return resp;
+        }
+        // The bulk-delete prefix is "ingredients/<ipath>" — we
+        // delete every file under that subtree of the working
+        // branch.
+        let prefix = if ipath.is_empty() {
+            "ingredients".to_string()
+        } else {
+            format!("ingredients/{}", ipath.trim_end_matches('/'))
+        };
+        let commit_message = format!("pankosmia: bulk delete ingredients/{}", ipath);
+        return handle_github_bulk(
+            cookies,
+            catalog,
+            app_auth,
+            tokens,
+            github_client,
+            locks,
+            rate_limiter,
+            language_header,
+            BulkOp::DeleteByPrefix { prefix },
+            &commit_message,
+        )
+        .await;
     }
     let path_components: Components<'_> = repo_path.components();
     let full_repo_path =
