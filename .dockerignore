@@ -22,6 +22,8 @@ temp/
 test_runtime/
 tests/
 example/
+dummy.csv
+src/bin/
 
 # Logs and OS noise
 *.log

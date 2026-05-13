@@ -92,6 +92,20 @@ impl CatalogRegistry {
         Ok(RegistryDiff { added, removed })
     }
 
+    pub fn reload_from_entries(&self, entries: Vec<RegisteredLanguage>) -> RegistryDiff {
+        let mut new_map = HashMap::new();
+        for r in entries {
+            new_map.insert(r.code.clone(), r);
+        }
+        let mut w = self.by_code.write();
+        let old = std::mem::replace(&mut *w, new_map);
+        let new_codes: std::collections::HashSet<_> = w.keys().cloned().collect();
+        let old_codes: std::collections::HashSet<_> = old.keys().cloned().collect();
+        let added: Vec<LanguageCode> = new_codes.difference(&old_codes).cloned().collect();
+        let removed: Vec<LanguageCode> = old_codes.difference(&new_codes).cloned().collect();
+        RegistryDiff { added, removed }
+    }
+
     pub fn get(&self, code: &LanguageCode) -> Option<RegisteredLanguage> {
         self.by_code.read().get(code).cloned()
     }

@@ -241,44 +241,85 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     let msg_queue = MsgQueue::new(Mutex::new(VecDeque::new()));
     my_rocket = my_rocket.manage(msg_queue).manage(clients);
 
-    // Catalog registry. Sourced from either:
-    //   - a GitHub catalog repo (PANKOSMIA_CATALOG_REPO) — cloned to
-    //     <workspace>/.pankosmia/catalog/ and refreshed on webhook
-    //     and periodic fetch.
-    //   - a local file path (PANKOSMIA_CATALOG_PATH) — read once at
-    //     boot; operators manage updates externally (e.g. image
-    //     rebuild for the baked-default case).
+    // Catalog registry. Three modes, checked in priority order:
+    //
+    //   1. **Org discovery** (`PANKOSMIA_CATALOG_ORG=<org>`) — searches
+    //      GitHub for repos with topic `pankosmia-language` in that org,
+    //      fetches each repo's `language.yaml`. No central file needed.
+    //   2. **Git-backed** (`PANKOSMIA_CATALOG_REPO=<owner>/<name>`) —
+    //      clones a catalog repo and reads `languages.yaml`.
+    //   3. **Local file** (`PANKOSMIA_CATALOG_PATH`) — reads a local
+    //      `languages.yaml` (legacy / baked-default).
     let catalog = Arc::new(crate::catalog::CatalogRegistry::empty());
+    let catalog_org: Option<String> = std::env::var("PANKOSMIA_CATALOG_ORG")
+        .ok()
+        .filter(|s| !s.is_empty());
+    let catalog_org = Arc::new(catalog_org);
+
+    if let Some(org) = catalog_org.as_deref() {
+        println!("Catalog source: org discovery ({})", org);
+        let boot_auth = crate::auth::GithubAppAuth::from_env().ok().flatten();
+        let install_id = std::env::var("PANKOSMIA_DEFAULT_INSTALLATION_ID")
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok());
+        match (boot_auth, install_id) {
+            (Some(auth), Some(id)) => {
+                let handle = tokio::runtime::Handle::current();
+                match handle.block_on(crate::catalog::discovery::discover_languages(
+                    &auth, id, org, &catalog,
+                )) {
+                    Ok(diff) => println!(
+                        "Catalog discovery: {} added, {} removed",
+                        diff.added.len(),
+                        diff.removed.len()
+                    ),
+                    Err(e) => eprintln!("WARN: catalog discovery failed at boot: {}", e),
+                }
+            }
+            (None, _) => {
+                eprintln!("WARN: PANKOSMIA_CATALOG_ORG set but GitHub App auth not configured");
+            }
+            (_, None) => {
+                eprintln!(
+                    "WARN: PANKOSMIA_CATALOG_ORG set but PANKOSMIA_DEFAULT_INSTALLATION_ID missing"
+                );
+            }
+        }
+    }
+
     let catalog_sync = std::sync::Arc::new(crate::catalog::CatalogSync::from_env(
         std::path::Path::new(&working_dir_path),
     ));
-    if let Some(slug) = &catalog_sync.repo_slug {
-        println!(
-            "Catalog source: github repo {} → {}",
-            slug,
-            catalog_sync.file_path.display()
-        );
-        if let Err(e) = catalog_sync.ensure_clone() {
-            eprintln!("WARN: catalog clone failed: {}", e);
+    if catalog_org.is_none() {
+        if let Some(slug) = &catalog_sync.repo_slug {
+            println!(
+                "Catalog source: github repo {} → {}",
+                slug,
+                catalog_sync.file_path.display()
+            );
+            if let Err(e) = catalog_sync.ensure_clone() {
+                eprintln!("WARN: catalog clone failed: {}", e);
+            }
+        } else {
+            println!(
+                "Catalog source: local file {}",
+                catalog_sync.file_path.display()
+            );
         }
-    } else {
-        println!(
-            "Catalog source: local file {}",
-            catalog_sync.file_path.display()
-        );
-    }
-    match catalog_sync.refresh(&catalog) {
-        Ok(diff) => println!(
-            "Catalog loaded from {}: {} added, {} removed",
-            catalog_sync.file_path.display(),
-            diff.added.len(),
-            diff.removed.len()
-        ),
-        Err(e) => eprintln!("WARN: catalog refresh failed at boot: {}", e),
+        match catalog_sync.refresh(&catalog) {
+            Ok(diff) => println!(
+                "Catalog loaded from {}: {} added, {} removed",
+                catalog_sync.file_path.display(),
+                diff.added.len(),
+                diff.removed.len()
+            ),
+            Err(e) => eprintln!("WARN: catalog refresh failed at boot: {}", e),
+        }
     }
     my_rocket = my_rocket
         .manage(catalog.clone())
-        .manage(catalog_sync.clone());
+        .manage(catalog_sync.clone())
+        .manage(catalog_org.clone());
 
     // Phase 2 storage abstraction. Endpoints call this trait object
     // instead of `std::fs::*` directly. The runtime selector picks
@@ -291,11 +332,21 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     // before `manage` consumes the store so we can hold our own
     // Arc clone. No-op cadence in FS mode (empty catalog).
     if let Some(interval) = crate::server::periodic_fetch::interval_from_env() {
+        let org_params = catalog_org.as_deref().and_then(|org| {
+            let id = std::env::var("PANKOSMIA_DEFAULT_INSTALLATION_ID")
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok())?;
+            Some(crate::server::periodic_fetch::OrgDiscoveryParams {
+                org: org.to_string(),
+                installation_id: id,
+            })
+        });
         crate::server::periodic_fetch::spawn(
             catalog.clone(),
             catalog_sync.clone(),
             project_store.clone(),
             interval,
+            org_params,
         );
     } else {
         println!("periodic_fetch: disabled (PANKOSMIA_PERIODIC_FETCH_INTERVAL_SECS=0)");

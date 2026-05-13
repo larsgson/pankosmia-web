@@ -12,6 +12,7 @@
 //! See `docs/STRATEGY_GITHUB_BACKEND.md` §4 for the file format
 //! and §10 for failure modes.
 
+pub mod discovery;
 pub mod registry;
 pub mod schema;
 pub mod sync;
