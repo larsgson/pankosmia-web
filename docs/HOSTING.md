@@ -55,21 +55,18 @@ ROCKET_ADDRESS=0.0.0.0
 ROCKET_PORT=19119
 ```
 
-Plus, for object-storage audio offload (when implemented):
-
-```bash
-S3_ENDPOINT=https://s3.example.com   # or supabase storage URL
-S3_ACCESS_KEY=...
-S3_SECRET_KEY=...
-S3_BUCKET=pankosmia-audio
-```
-
 Optional:
 
 ```bash
-DATABASE_MAX_CONNECTIONS=10                # if a SQL backend is enabled
-SUPABASE_JWKS_URL=...                      # vestigial; only if JWT auth is layered
-SUPABASE_JWT_AUDIENCE=authenticated        # vestigial
+PANKOSMIA_PERIODIC_FETCH_INTERVAL_SECS=900   # background language-cache refresh; default 900 = 15 min; 0 disables
+
+# Audio reference validation. Writes to audio_content/**/ref.json (or
+# any .audioref) are validated against the v1 schema and license
+# allowlist before going to GitHub. Audio bytes live elsewhere
+# (Internet Archive primary); see docs/impl/AUDIO_STRATEGY.md.
+PANKOSMIA_ALLOWED_LICENSES=CC0-1.0,CC-BY-4.0,CC-BY-SA-4.0       # comma-separated SPDX IDs; * disables; default = built-in CC list
+PANKOSMIA_AUDIO_URL_HOSTS_ALLOWLIST=archive.org,cdn.door43.org  # optional; restricts which hosts can be referenced
+PANKOSMIA_VALIDATE_AUDIO_URLS=false                             # if true, HEAD-check audio URLs at write time
 ```
 
 ---

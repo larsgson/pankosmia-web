@@ -3,7 +3,7 @@ use crate::endpoints::burrito2::github_save::{
     handle_github_op, is_github_backend, validate_ipath_segments,
 };
 use crate::server::{LanguageLocks, RateLimiter};
-use crate::store::github::{GithubEditFlow, SaveOp};
+use crate::store::github::{AudioRefConfig, GithubEditFlow, SaveOp};
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::burrito::destination_parent;
@@ -34,6 +34,7 @@ pub async fn copy_ingredient(
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
+    audio_ref_cfg: &State<AudioRefConfig>,
     language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
     src_path: String,
@@ -59,6 +60,7 @@ pub async fn copy_ingredient(
             github_client,
             locks,
             rate_limiter,
+            audio_ref_cfg,
             language_header,
             SaveOp::Copy {
                 src_ipath: &src_path,

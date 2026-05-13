@@ -293,7 +293,8 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
         .manage(crate::server::LanguageLocks::new())
         .manage(crate::server::BlockingPools::new())
         .manage(crate::server::WatcherRegistry::new())
-        .manage(crate::server::RateLimiter::default_for_saves());
+        .manage(crate::server::RateLimiter::default_for_saves())
+        .manage(crate::store::github::AudioRefConfig::from_env());
 
     // GitHub OAuth + token store. The OAuth client_id /
     // client_secret are read from env. If not set, the OAuth

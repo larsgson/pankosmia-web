@@ -3,7 +3,7 @@ use crate::endpoints::burrito2::github_save::{
     handle_github_op, is_github_backend, validate_ipath_segments,
 };
 use crate::server::{LanguageLocks, RateLimiter};
-use crate::store::github::{GithubEditFlow, SaveOp};
+use crate::store::github::{AudioRefConfig, GithubEditFlow, SaveOp};
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -33,6 +33,7 @@ pub async fn post_revert_ingredient(
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
+    audio_ref_cfg: &State<AudioRefConfig>,
     language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
     ipath: String,
@@ -50,6 +51,7 @@ pub async fn post_revert_ingredient(
             github_client,
             locks,
             rate_limiter,
+            audio_ref_cfg,
             language_header,
             SaveOp::Revert { ipath: &ipath },
             &commit_message,

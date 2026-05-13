@@ -335,6 +335,101 @@ UI guidance for clients:
 
 ---
 
+## 7b. Audio references
+
+Audio bytes never live on `pankosmia_docker`. Instead, clients store
+small JSON reference files inside the burrito that point at audio
+hosted externally — primarily on Internet Archive, secondarily on any
+other CC-licensed host. The full strategy is in
+`docs/impl/AUDIO_STRATEGY.md`; the integration surface for clients is
+just the standard ingredient save endpoint.
+
+### Reference file shape (v1)
+
+Stored as a regular burrito ingredient. The conventional path is
+`audio_content/<chapter>-<paragraph>/ref.json` but the validator
+matches any path under `audio_content/` ending in `ref.json`, plus
+`*.audioref`.
+
+```json
+{
+  "schema_version": 1,
+  "url": "https://archive.org/download/<item>/<file>.mp3",
+  "type": "audio/mp3",
+  "license": "CC-BY-SA-4.0",
+
+  "duration_sec": 47,
+  "size_bytes": 752394,
+  "uploaded_by": "<github-login>",
+  "uploaded_at": "2026-05-13T14:22:00Z",
+  "attribution": "Recorded by María García, 2026"
+}
+```
+
+Required: `schema_version`, `url`, `type`, `license`. Optional fields
+are passed through unchanged.
+
+A multi-take variant is also supported (used for OBS-style "N takes
+per paragraph" recording flows):
+
+```json
+{
+  "schema_version": 1,
+  "takes": [
+    { "url": "...", "type": "audio/mp3", "license": "CC-BY-4.0", "label": "take 1" },
+    { "url": "...", "type": "audio/mp3", "license": "CC-BY-4.0", "label": "take 2" }
+  ],
+  "main_take_index": 1
+}
+```
+
+### Writing an audio reference
+
+Use the same `POST /burrito/ingredient/raw/...` endpoint as for any
+other text ingredient:
+
+```js
+async function saveAudioRef(repoPath, ipath, refJson) {
+  const url =
+    `${API_BASE}/burrito/ingredient/raw/${encodeRepoPath(repoPath)}` +
+    `?ipath=${encodeURIComponent(ipath)}`;
+  return authedFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ payload: JSON.stringify(refJson) }),
+  }).then(r => r.json());
+}
+```
+
+The server runs schema + license validation **before** any GitHub
+round-trip. On failure: HTTP 400 with a `reason` like
+`audio reference: license 'Proprietary' not in allowed-licenses list`.
+On success: same `{is_good, status: "saved", pr_url, ...}` envelope
+as any other save.
+
+### License policy
+
+By default the server accepts these SPDX-style license values:
+
+`CC0-1.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`, `CC-BY-NC-4.0`, `CC-BY-ND-4.0`,
+`CC-BY-NC-SA-4.0`, `CC-BY-NC-ND-4.0`, `Public-Domain`.
+
+Operators can override via `PANKOSMIA_ALLOWED_LICENSES` (see
+`docs/HOSTING.md` §2). Setting it to `*` disables validation.
+
+### Playback
+
+PWAs play audio directly. No server involvement:
+
+```jsx
+<audio src={refJson.url} controls preload="metadata" />
+```
+
+This depends on the host's CORS policy. Internet Archive serves
+audio with `Access-Control-Allow-Origin: *`; other hosts may not.
+
+---
+
 ## 8. Admin / review panel
 
 Visible to users with `admin` or `maintain` permission on the
@@ -573,12 +668,6 @@ Not yet wired at all:
   user's resolved bytes after the server returns a 409 with
   three-way diff data. Until then a conflict surfaces as a 502 from
   the underlying GitHub PUT.
-- **Audio off the request path.** Future `/burrito/audio/upload-url`
-  / `/burrito/audio/finalize` / `/burrito/audio/download-url` will
-  hand the browser short-lived presigned PUT/GET URLs against an
-  object-storage backend. Today, audio uploads go through the bytes
-  endpoint (capped at 700 KB, see §6.2) — fine for small clips, not
-  for production audio.
 - **`/me/pending-prs`** (translator-facing list of one's own open
   edits). Coming alongside the trusted-contributors mitigation
   documented in `docs/SECURITY.md` §4.

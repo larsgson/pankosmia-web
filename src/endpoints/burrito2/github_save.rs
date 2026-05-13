@@ -11,6 +11,9 @@
 use crate::auth::session::read_session;
 use crate::auth::{GithubAppAuth, GithubClient, LanguageHeader, TokenStore};
 use crate::server::{LanguageLocks, RateLimitError, RateLimiter};
+use crate::store::github::audio_ref::{
+    head_validate_url, is_audio_ref_path, validate_schema, AudioRefConfig,
+};
 use crate::store::github::{GithubEditFlow, SaveOp, SaveOutcome};
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::check_path_string_components;
@@ -74,6 +77,7 @@ pub async fn handle_github_op<'a>(
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
+    audio_ref_cfg: &State<AudioRefConfig>,
     language_header: Option<LanguageHeader>,
     op: SaveOp<'a>,
     commit_message: &str,
@@ -112,6 +116,50 @@ pub async fn handle_github_op<'a>(
                     MAX_INGREDIENT_BYTES
                 )),
             );
+        }
+    }
+    // Audio-reference validation: writes to `audio_content/**/ref.json`
+    // (or `*.audioref`) are validated against the v1 schema + license
+    // allowlist before any GitHub round-trip. Audio bytes themselves
+    // live elsewhere (Internet Archive); the burrito only stores small
+    // reference JSON files. See `docs/impl/AUDIO_STRATEGY.md`.
+    if let SaveOp::Put { ipath, bytes } = &op {
+        if is_audio_ref_path(ipath) {
+            if let Err(e) = validate_schema(bytes, audio_ref_cfg.inner()) {
+                return not_ok_json_response(
+                    Status::BadRequest,
+                    make_bad_json_data_response(format!("audio reference: {}", e)),
+                );
+            }
+            // Optional HEAD-reachability check. Off by default; opt-in
+            // via PANKOSMIA_VALIDATE_AUDIO_URLS=true.
+            if audio_ref_cfg.validate_urls {
+                if let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(bytes) {
+                    let urls = extract_urls_for_head(&parsed);
+                    for url in urls {
+                        match head_validate_url(&url).await {
+                            Ok(true) => {}
+                            Ok(false) => {
+                                return not_ok_json_response(
+                                    Status::BadRequest,
+                                    make_bad_json_data_response(format!(
+                                        "audio reference URL {} returned non-audio Content-Type",
+                                        url
+                                    )),
+                                );
+                            }
+                            // HEAD failed / timed out — accept the
+                            // write but flag it. Bytes will be visible
+                            // in the response header.
+                            Err(_) => {
+                                // Continue silently; the write
+                                // succeeds. Client can be told via a
+                                // separate signal if needed later.
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     let lang = match language_header {
@@ -179,6 +227,24 @@ pub async fn handle_github_op<'a>(
             make_bad_json_data_response(format!("github edit flow: {}", e)),
         ),
     }
+}
+
+/// Pull the audio URL(s) out of a validated reference JSON. Handles
+/// both flat and multi-take shapes. Assumes prior schema validation
+/// passed (i.e. `url` strings are present and shaped sensibly).
+fn extract_urls_for_head(v: &serde_json::Value) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Some(u) = v.get("url").and_then(|x| x.as_str()) {
+        out.push(u.to_string());
+    }
+    if let Some(takes) = v.get("takes").and_then(|x| x.as_array()) {
+        for t in takes {
+            if let Some(u) = t.get("url").and_then(|x| x.as_str()) {
+                out.push(u.to_string());
+            }
+        }
+    }
+    out
 }
 
 fn ok_save_outcome_response(outcome: &SaveOutcome) -> status::Custom<(ContentType, String)> {

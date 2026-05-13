@@ -3,7 +3,7 @@ use crate::endpoints::burrito2::github_save::{
     handle_github_op, is_github_backend, validate_ipath_segments,
 };
 use crate::server::{LanguageLocks, RateLimiter};
-use crate::store::github::{GithubEditFlow, SaveOp};
+use crate::store::github::{AudioRefConfig, GithubEditFlow, SaveOp};
 use crate::structs::{AppSettings, BurritoMetadata};
 use crate::utils::burrito::{
     destination_parent, ingredients_metadata_from_files, ingredients_scopes_from_files,
@@ -49,6 +49,7 @@ pub async fn post_raw_ingredient(
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
+    audio_ref_cfg: &State<AudioRefConfig>,
     language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
     ipath: String,
@@ -79,6 +80,7 @@ pub async fn post_raw_ingredient(
             github_client,
             locks,
             rate_limiter,
+            audio_ref_cfg,
             language_header,
             SaveOp::Put { ipath: &ipath, bytes: &bytes },
             &commit_message,
