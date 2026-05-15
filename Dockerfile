@@ -10,8 +10,17 @@
 #   /app/catalog/languages.yaml      ← initial catalog (overridable via PANKOSMIA_CATALOG_PATH)
 #   /data                            ← workspace dir; volume-mounted in production
 
+# --- Planner stage ------------------------------------------------
+FROM rust:1.90-slim-bookworm AS planner
+RUN cargo install cargo-chef --locked
+WORKDIR /build
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN cargo chef prepare --recipe-path recipe.json
+
 # --- Build stage --------------------------------------------------
 FROM rust:1.90-slim-bookworm AS build
+RUN cargo install cargo-chef --locked
 WORKDIR /build
 
 RUN apt-get update \
@@ -23,16 +32,14 @@ RUN apt-get update \
        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Fetch deps separately so the registry layer caches across most
-# code changes. Compile happens in the next layer with the real
-# sources — the stub-source dep-cache trick is too fragile with
-# Cargo's fingerprint tracking when the crate has both [[bin]] and
-# [lib] targets.
-COPY Cargo.toml Cargo.lock ./
-RUN cargo fetch --locked
+# Cook dependencies (cached until Cargo.toml/Cargo.lock change).
+COPY --from=planner /build/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 
+# Build only the application code (fast — deps already compiled).
+COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-RUN cargo build --release --locked --offline
+RUN cargo build --release --locked
 
 # --- Runtime stage ------------------------------------------------
 FROM debian:bookworm-slim
