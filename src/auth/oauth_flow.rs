@@ -21,6 +21,7 @@ use crate::auth::token_store::TokenStore;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::response::{not_ok_json_response, ok_json_response};
 use rocket::http::{ContentType, CookieJar, Status};
+use rocket::request::{FromRequest, Outcome, Request};
 use rocket::response::status;
 use rocket::response::Redirect;
 use rocket::{get, post, State};
@@ -31,12 +32,61 @@ use uuid::Uuid;
 // flow inherits scopes from the App's declared permissions; the
 // classic OAuth `scope=` parameter is ignored. Identity-only login.
 
-fn server_origin() -> String {
+fn default_origin() -> String {
     std::env::var("PANKOSMIA_PUBLIC_ORIGIN").unwrap_or_else(|_| "http://127.0.0.1:19119".into())
 }
 
-fn callback_url() -> String {
-    format!("{}/auth/callback", server_origin())
+fn allowed_origins() -> Vec<String> {
+    let mut origins = Vec::new();
+    if let Ok(list) = std::env::var("PANKOSMIA_ALLOWED_ORIGINS") {
+        for entry in list.split(',') {
+            let trimmed = entry.trim().trim_end_matches('/').to_string();
+            if !trimmed.is_empty() {
+                origins.push(trimmed);
+            }
+        }
+    }
+    let default = default_origin();
+    if !origins.contains(&default) {
+        origins.push(default);
+    }
+    origins
+}
+
+/// Request guard that resolves the public origin for OAuth callbacks.
+/// Checks `X-Forwarded-Host` and `Origin` headers against the
+/// allowlist (`PANKOSMIA_ALLOWED_ORIGINS`), falling back to
+/// `PANKOSMIA_PUBLIC_ORIGIN`.
+pub struct ResolvedOrigin(pub String);
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for ResolvedOrigin {
+    type Error = std::convert::Infallible;
+
+    async fn from_request(req: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let allowed = allowed_origins();
+        if let Some(fwd) = req.headers().get_one("X-Forwarded-Host").map(|h| h.trim()) {
+            let proto = req
+                .headers()
+                .get_one("X-Forwarded-Proto")
+                .unwrap_or("https");
+            let candidate = format!("{}://{}", proto, fwd.trim_end_matches('/'));
+            if allowed.iter().any(|a| a == &candidate) {
+                return Outcome::Success(ResolvedOrigin(candidate));
+            }
+        }
+        if let Some(origin) = req.headers().get_one("Origin").map(|h| h.trim()) {
+            let candidate = origin.trim_end_matches('/').to_string();
+            if allowed.iter().any(|a| a == &candidate) {
+                return Outcome::Success(ResolvedOrigin(candidate));
+            }
+        }
+        Outcome::Success(ResolvedOrigin(default_origin()))
+    }
+}
+
+fn callback_url_for(origin: &str) -> String {
+    format!("{}/auth/callback", origin)
 }
 
 /// `GET /auth/start?redirect=/some/path`
@@ -44,12 +94,19 @@ fn callback_url() -> String {
 /// Generates a CSRF state, stashes it in a cookie, redirects the
 /// browser to GitHub's OAuth authorize endpoint. After approval,
 /// GitHub bounces back to `/auth/callback`.
+///
+/// The callback URL is derived from the request's origin (via
+/// `X-Forwarded-Host` or `Origin` header), validated against
+/// `PANKOSMIA_ALLOWED_ORIGINS`. This allows multiple Netlify apps
+/// (or other proxies) to share one backend.
 #[get("/auth/start?<redirect>")]
 pub fn auth_github_start(
+    resolved: ResolvedOrigin,
     cookies: &CookieJar<'_>,
     client: &State<GithubClient>,
     redirect: Option<String>,
 ) -> Redirect {
+    let cb = callback_url_for(&resolved.0);
     let state = format!(
         "{}|{}",
         Uuid::new_v4(),
@@ -60,7 +117,7 @@ pub fn auth_github_start(
         "https://github.com/login/oauth/authorize\
          ?client_id={}&redirect_uri={}&state={}",
         urlencoding::encode(&client.client_id),
-        urlencoding::encode(&callback_url()),
+        urlencoding::encode(&cb),
         urlencoding::encode(&state),
     );
     Redirect::to(url)
@@ -72,6 +129,7 @@ pub fn auth_github_start(
 /// session, redirects to the original page.
 #[get("/auth/callback?<code>&<state>")]
 pub async fn auth_github_callback(
+    resolved: ResolvedOrigin,
     cookies: &CookieJar<'_>,
     client: &State<GithubClient>,
     tokens: &State<TokenStore>,
@@ -104,15 +162,13 @@ pub async fn auth_github_callback(
     }
     clear_oauth_state(cookies);
 
-    let token = client
-        .exchange_oauth_code(&code, &callback_url())
-        .await
-        .map_err(|e| {
-            not_ok_json_response(
-                Status::BadRequest,
-                make_bad_json_data_response(format!("oauth exchange: {}", e)),
-            )
-        })?;
+    let cb = callback_url_for(&resolved.0);
+    let token = client.exchange_oauth_code(&code, &cb).await.map_err(|e| {
+        not_ok_json_response(
+            Status::BadRequest,
+            make_bad_json_data_response(format!("oauth exchange: {}", e)),
+        )
+    })?;
     let user = client.get_user(&token.access_token).await.map_err(|e| {
         not_ok_json_response(
             Status::BadGateway,

@@ -7,10 +7,10 @@
 //!
 //! Cookie attributes (set in `set_session`):
 //!   - HttpOnly: yes
-//!   - Secure: derived from PANKOSMIA_PUBLIC_ORIGIN scheme. HTTPS →
-//!                Secure; plain-HTTP local dev → not Secure (otherwise
-//!                Safari and Firefox drop the cookie before the
-//!                OAuth callback can read it).
+//!   - Secure: `true` when any configured origin uses HTTPS
+//!     (`PANKOSMIA_PUBLIC_ORIGIN` or `PANKOSMIA_ALLOWED_ORIGINS`).
+//!     Plain-HTTP local dev → not Secure (otherwise Safari and
+//!     Firefox drop the cookie before the OAuth callback can read it).
 //!   - SameSite: Lax — needs to be Lax (not Strict) so the OAuth
 //!                callback redirect from github.com carries the
 //!                cookie back. Strict would drop the cookie on
@@ -25,8 +25,14 @@ pub const SESSION_COOKIE_NAME: &str = "pankosmia_session";
 pub const OAUTH_STATE_COOKIE_NAME: &str = "pankosmia_oauth_state";
 
 fn use_secure_cookies() -> bool {
-    std::env::var("PANKOSMIA_PUBLIC_ORIGIN")
+    if std::env::var("PANKOSMIA_PUBLIC_ORIGIN")
         .map(|o| o.starts_with("https://"))
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    std::env::var("PANKOSMIA_ALLOWED_ORIGINS")
+        .map(|list| list.split(',').any(|e| e.trim().starts_with("https://")))
         .unwrap_or(false)
 }
 
