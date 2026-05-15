@@ -33,6 +33,7 @@ use crate::catalog::CatalogRegistry;
 use crate::identity::{LanguageCode, RepoId, UserId};
 use crate::store::fs::paths;
 use crate::store::project_store::{ProjectStore, Tx};
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::types::*;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
@@ -42,6 +43,7 @@ use std::sync::Arc;
 pub struct GitHubLanguageStore {
     workspace_root: PathBuf,
     registry: Arc<CatalogRegistry>,
+    user_state: Option<Arc<SqliteUserState>>,
 }
 
 impl GitHubLanguageStore {
@@ -49,7 +51,13 @@ impl GitHubLanguageStore {
         Self {
             workspace_root,
             registry,
+            user_state: None,
         }
+    }
+
+    pub fn with_sqlite(mut self, db: Arc<SqliteUserState>) -> Self {
+        self.user_state = Some(db);
+        self
     }
 
     fn language_clone_root(&self, lang: &LanguageCode) -> PathBuf {
@@ -152,75 +160,121 @@ impl ProjectStore for GitHubLanguageStore {
 
     // --- per-user settings ----------------------------------------
     //
-    // Per the strategy: BCV, typography move to client localStorage.
-    // Server returns defaults so existing M2 endpoints respond with
-    // something sensible; clients should rely on localStorage
-    // instead.
+    // Delegated to SqliteUserState when configured; falls back to
+    // defaults otherwise (backwards-compatible with the pre-SQLite
+    // behaviour where clients used localStorage).
 
     async fn get_user_settings(&self, _user: UserId) -> StoreResult<UserSettings> {
         Err(StoreError::NotFound)
     }
     async fn put_user_settings(&self, _user: UserId, _s: UserSettings) -> StoreResult<()> {
-        // Accept silently — clients should be using localStorage.
         Ok(())
     }
-    async fn get_languages(&self, _user: UserId) -> StoreResult<Vec<LanguageCode>> {
-        Ok(Vec::new())
+    async fn get_languages(&self, user: UserId) -> StoreResult<Vec<LanguageCode>> {
+        match &self.user_state {
+            Some(db) => db.get_languages(&user),
+            None => Ok(Vec::new()),
+        }
     }
-    async fn put_languages(&self, _user: UserId, _langs: Vec<LanguageCode>) -> StoreResult<()> {
-        Ok(())
+    async fn put_languages(&self, user: UserId, langs: Vec<LanguageCode>) -> StoreResult<()> {
+        match &self.user_state {
+            Some(db) => db.put_languages(&user, &langs),
+            None => Ok(()),
+        }
     }
-    async fn get_typography(&self, _user: UserId) -> StoreResult<Typography> {
+    async fn get_typography(&self, user: UserId) -> StoreResult<Typography> {
+        if let Some(db) = &self.user_state {
+            // Typography is per-(user, language) but the trait method
+            // only receives user. Use a global fallback key until
+            // the trait gains a language parameter.
+            let global_lang = LanguageCode::parse("x-global").unwrap();
+            if let Some(t) = db.get_typography(&user, &global_lang)? {
+                return Ok(t);
+            }
+        }
         Ok(default_typography())
     }
-    async fn put_typography(&self, _user: UserId, _t: Typography) -> StoreResult<()> {
-        Ok(())
+    async fn put_typography(&self, user: UserId, t: Typography) -> StoreResult<()> {
+        match &self.user_state {
+            Some(db) => {
+                let global_lang = LanguageCode::parse("x-global").unwrap();
+                db.put_typography(&user, &global_lang, &t)
+            }
+            None => Ok(()),
+        }
     }
 
-    // --- per-language app state ----------------------------------
-    //
-    // Same as above — defaults; clients use localStorage.
+    // --- per-language app state -----------------------------------
 
-    async fn get_app_state(&self, _lang: LanguageCode) -> StoreResult<AppState> {
+    async fn get_app_state(&self, lang: LanguageCode) -> StoreResult<AppState> {
+        if let Some(db) = &self.user_state {
+            if let Some(s) = db.get_app_state(&lang)? {
+                return Ok(s);
+            }
+        }
         Ok(AppState { bcv: default_bcv() })
     }
-    async fn put_app_state(&self, _lang: LanguageCode, _s: AppState) -> StoreResult<()> {
-        Ok(())
+    async fn put_app_state(&self, lang: LanguageCode, s: AppState) -> StoreResult<()> {
+        match &self.user_state {
+            Some(db) => db.put_app_state(&lang, &s),
+            None => Ok(()),
+        }
     }
-    async fn get_bcv(&self, _lang: LanguageCode, _user: UserId) -> StoreResult<Bcv> {
+    async fn get_bcv(&self, lang: LanguageCode, user: UserId) -> StoreResult<Bcv> {
+        if let Some(db) = &self.user_state {
+            if let Some(bcv) = db.get_bcv(&user, &lang)? {
+                return Ok(bcv);
+            }
+        }
         Ok(default_bcv())
     }
-    async fn put_bcv(&self, _lang: LanguageCode, _user: UserId, _bcv: Bcv) -> StoreResult<()> {
-        Ok(())
+    async fn put_bcv(&self, lang: LanguageCode, user: UserId, bcv: Bcv) -> StoreResult<()> {
+        match &self.user_state {
+            Some(db) => db.put_bcv(&user, &lang, &bcv),
+            None => Ok(()),
+        }
     }
 
-    // --- gitea OAuth ----------------------------------------------
-    //
-    // Desktop-only feature; not used on hosted. Empty.
+    // --- auth tokens ---------------------------------------------
 
-    async fn get_auth_token(&self, _user: UserId, _key: &str) -> StoreResult<Option<String>> {
-        Ok(None)
+    async fn get_auth_token(&self, user: UserId, key: &str) -> StoreResult<Option<String>> {
+        match &self.user_state {
+            Some(db) => db.get_auth_token(&user, key),
+            None => Ok(None),
+        }
     }
-    async fn put_auth_token(&self, _user: UserId, _key: &str, _code: &str) -> StoreResult<()> {
-        Ok(())
+    async fn put_auth_token(&self, user: UserId, key: &str, code: &str) -> StoreResult<()> {
+        match &self.user_state {
+            Some(db) => db.put_auth_token(&user, key, code),
+            None => Ok(()),
+        }
     }
-    async fn delete_auth_token(&self, _user: UserId, _key: &str) -> StoreResult<()> {
-        Ok(())
+    async fn delete_auth_token(&self, user: UserId, key: &str) -> StoreResult<()> {
+        match &self.user_state {
+            Some(db) => db.delete_auth_token(&user, key),
+            None => Ok(()),
+        }
     }
     async fn put_auth_request(
         &self,
-        _user: UserId,
-        _key: &str,
-        _req: AuthRequest,
+        user: UserId,
+        key: &str,
+        req: AuthRequest,
     ) -> StoreResult<()> {
-        Ok(())
+        match &self.user_state {
+            Some(db) => db.put_auth_request(&user, key, &req),
+            None => Ok(()),
+        }
     }
     async fn take_auth_request(
         &self,
-        _user: UserId,
-        _key: &str,
+        user: UserId,
+        key: &str,
     ) -> StoreResult<Option<AuthRequest>> {
-        Ok(None)
+        match &self.user_state {
+            Some(db) => db.take_auth_request(&user, key),
+            None => Ok(None),
+        }
     }
 
     // --- repo registry --------------------------------------------

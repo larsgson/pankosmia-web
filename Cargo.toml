@@ -61,3 +61,4 @@ base64 = "0.22"
 urlencoding = "2"
 serde_yaml = "0.9"
 hmac = "0.12"
+rusqlite = { version = "0.33", features = ["bundled"] }

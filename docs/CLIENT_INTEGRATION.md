@@ -586,6 +586,67 @@ super-admin.
 
 ---
 
+## 8b. Requesting reviewer access
+
+Translators who want to review and merge PRs for a language can
+request write access. The backend is a GitHub Action on
+`pankosmia-langs/.github` that auto-approves requests; the client
+should hide this behind a UI button so the user never interacts with
+GitHub directly.
+
+### How it works (backend)
+
+1. An issue is created on `pankosmia-langs/.github` with label
+   `reviewer-request` and the target language code in the body.
+2. A GitHub Action fires, validates the language repo exists, grants
+   the issue author `write` access on `pankosmia-langs/<language>`,
+   and closes the issue with a confirmation comment.
+
+### Client integration
+
+The user is already signed in (§3) and has a session cookie. The
+client calls the pankosmia server (or the GitHub API directly via
+the user's identity) to create the issue:
+
+```js
+async function requestReviewerAccess(languageCode) {
+  // Create the issue via the GitHub API using the App's
+  // installation token (server-side endpoint, not yet built).
+  const resp = await authedFetch(
+    `${API_BASE}/admin/request-reviewer?language=${languageCode}`,
+    { method: 'POST' }
+  );
+  return resp.json();
+  // { is_good: true, issue_url: "https://github.com/..." }
+}
+```
+
+The server-side endpoint (`POST /admin/request-reviewer`) is not
+yet implemented. When built, it should:
+
+1. Mint an installation token for the `pankosmia-langs` org.
+2. `POST /repos/pankosmia-langs/.github/issues` with the
+   `reviewer-request` label and the language code in the body
+   (matching the issue template format).
+3. The Action picks it up from there.
+
+Once this endpoint exists, the `pankosmia-langs/.github` repo can
+be made **private** — the App token creates issues regardless of
+repo visibility, so the user never needs direct GitHub access.
+
+### UI guidance
+
+- Show a "Become a reviewer" button on the language page, visible
+  to signed-in users who are not already reviewers.
+- After the request, show a brief confirmation ("Access granted"
+  or "Request submitted"). The Action typically completes within
+  seconds.
+- To check whether the user already has reviewer access, use the
+  existing admin permission check (the server re-verifies via the
+  GitHub collaborators API on every admin request).
+
+---
+
 ## 9. Health and version
 
 - `GET /version` — same shape as pankosmia-web (`pkg_version`,

@@ -10,6 +10,7 @@
 use crate::catalog::CatalogRegistry;
 use crate::store::fs::FsLanguageStore;
 use crate::store::github::GitHubLanguageStore;
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::SharedProjectStore;
 use std::env;
 use std::path::PathBuf;
@@ -28,8 +29,28 @@ pub fn build_project_store(
         "github" => {
             let registry =
                 catalog.expect("STORAGE_BACKEND=github requires a CatalogRegistry; pass Some(...)");
-            Arc::new(GitHubLanguageStore::new(workspace_root, registry))
+            let mut store = GitHubLanguageStore::new(workspace_root, registry);
+            if let Some(db) = open_sqlite_if_configured() {
+                store = store.with_sqlite(Arc::new(db));
+            }
+            Arc::new(store)
         }
         other => panic!("unknown STORAGE_BACKEND={}", other),
+    }
+}
+
+fn open_sqlite_if_configured() -> Option<SqliteUserState> {
+    let path = env::var("PANKOSMIA_SQLITE_PATH")
+        .ok()
+        .filter(|s| !s.is_empty())?;
+    match SqliteUserState::open(std::path::Path::new(&path)) {
+        Ok(db) => {
+            println!("SQLite user state: {}", path);
+            Some(db)
+        }
+        Err(e) => {
+            eprintln!("WARN: SQLite user state failed to open {}: {}", path, e);
+            None
+        }
     }
 }

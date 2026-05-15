@@ -13,6 +13,7 @@ pub mod git_workspace;
 pub mod github;
 pub mod project_store;
 pub mod selector;
+pub mod sqlite_user_state;
 pub mod types;
 
 pub use blob_store::BlobStore;
