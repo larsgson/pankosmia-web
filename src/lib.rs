@@ -264,10 +264,11 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
             .and_then(|s| s.parse::<u64>().ok());
         match (boot_auth, install_id) {
             (Some(auth), Some(id)) => {
-                let handle = tokio::runtime::Handle::current();
-                match handle.block_on(crate::catalog::discovery::discover_languages(
-                    &auth, id, org, &catalog,
-                )) {
+                match tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(
+                        crate::catalog::discovery::discover_languages(&auth, id, org, &catalog),
+                    )
+                }) {
                     Ok(diff) => println!(
                         "Catalog discovery: {} added, {} removed",
                         diff.added.len(),
