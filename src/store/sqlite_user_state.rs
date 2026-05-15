@@ -199,22 +199,13 @@ impl SqliteUserState {
         Ok(())
     }
 
-    pub fn put_auth_request(
-        &self,
-        user: &UserId,
-        key: &str,
-        req: &AuthRequest,
-    ) -> StoreResult<()> {
+    pub fn put_auth_request(&self, user: &UserId, key: &str, req: &AuthRequest) -> StoreResult<()> {
         let db_key = format!("auth_req:{}", key);
         let json = serde_json::to_string(req)?;
         self.put_user(user, &db_key, &json)
     }
 
-    pub fn take_auth_request(
-        &self,
-        user: &UserId,
-        key: &str,
-    ) -> StoreResult<Option<AuthRequest>> {
+    pub fn take_auth_request(&self, user: &UserId, key: &str) -> StoreResult<Option<AuthRequest>> {
         let db_key = format!("auth_req:{}", key);
         let val = self.get_user(user, &db_key)?;
         if val.is_some() {

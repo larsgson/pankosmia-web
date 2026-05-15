@@ -255,22 +255,13 @@ impl ProjectStore for GitHubLanguageStore {
             None => Ok(()),
         }
     }
-    async fn put_auth_request(
-        &self,
-        user: UserId,
-        key: &str,
-        req: AuthRequest,
-    ) -> StoreResult<()> {
+    async fn put_auth_request(&self, user: UserId, key: &str, req: AuthRequest) -> StoreResult<()> {
         match &self.user_state {
             Some(db) => db.put_auth_request(&user, key, &req),
             None => Ok(()),
         }
     }
-    async fn take_auth_request(
-        &self,
-        user: UserId,
-        key: &str,
-    ) -> StoreResult<Option<AuthRequest>> {
+    async fn take_auth_request(&self, user: UserId, key: &str) -> StoreResult<Option<AuthRequest>> {
         match &self.user_state {
             Some(db) => db.take_auth_request(&user, key),
             None => Ok(None),

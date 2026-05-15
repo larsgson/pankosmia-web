@@ -163,10 +163,7 @@ async fn fetch_language_yaml(
     token: &str,
     repo: &str,
 ) -> Result<LanguageYaml, DiscoveryError> {
-    let url = format!(
-        "{}/repos/{}/contents/language.yaml",
-        GITHUB_API, repo
-    );
+    let url = format!("{}/repos/{}/contents/language.yaml", GITHUB_API, repo);
     let resp = client
         .get(&url)
         .bearer_auth(token)
