@@ -49,7 +49,8 @@ PANKOSMIA_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)    # 32 bytes, base64
 ROCKET_SECRET_KEY=$(openssl rand -base64 32)                 # cookie signing
 
 # Server
-PANKOSMIA_PUBLIC_ORIGIN=https://example.com                  # for OAuth callback URL
+PANKOSMIA_PUBLIC_ORIGIN=https://example.com                  # for OAuth callback URL + cookie Secure flag
+PANKOSMIA_ALLOWED_ORIGINS=https://a.netlify.app,https://b.netlify.app  # optional; extra origins allowed for OAuth callbacks
 
 # Catalog source — pick ONE:
 PANKOSMIA_CATALOG_REPO=larsgson/pankosmia-catalog            # github repo owner/name; server clones + refreshes
@@ -90,7 +91,7 @@ GitHub App** (not "OAuth Apps").
 |---|---|
 | GitHub App name | anything unique; users see it on the consent screen and it appears as the commit author |
 | Homepage URL | `https://<your-server>` (the public origin) |
-| Callback URL | `https://<your-server>/auth/callback` |
+| Callback URL | `https://<your-server>/auth/callback` (add one per allowed origin if using `PANKOSMIA_ALLOWED_ORIGINS`) |
 | Request user authorization (OAuth) during installation | **unchecked** (the app initiates OAuth from a sign-in button, not at install time) |
 | Webhook | **unchecked** — we use repo-level webhooks separately (see §6); the App's webhook isn't needed |
 | Repository permissions | **Contents: Read and write**, **Pull requests: Read and write**, **Metadata: Read** |
@@ -130,6 +131,41 @@ Wire installations to languages via the catalog (one of):
   account.
 
 Both can coexist: the per-language value overrides the default.
+
+### 3.3 Multi-origin / reverse proxy (optional)
+
+When the backend is accessed through one or more reverse proxies
+(e.g. Netlify, Cloudflare, a custom nginx), each proxy has its own
+public origin. The OAuth callback URL must match the origin the
+browser sees, so the server needs to know which origins are allowed.
+
+Set `PANKOSMIA_ALLOWED_ORIGINS` to a comma-separated list of every
+public origin that should support OAuth sign-in:
+
+```bash
+PANKOSMIA_ALLOWED_ORIGINS=https://app-a.netlify.app,https://app-b.netlify.app,https://pankosmia-web.up.railway.app
+```
+
+`PANKOSMIA_PUBLIC_ORIGIN` is always implicitly included as a
+fallback, so existing single-origin deployments need no change.
+
+How it works:
+
+1. The proxy forwards the request to the backend. The browser's
+   `Origin` header (or the proxy's `X-Forwarded-Host` +
+   `X-Forwarded-Proto` headers) tells the backend which origin
+   the request came from.
+2. The backend validates the header against the allowlist.
+3. If it matches, the OAuth `redirect_uri` is constructed using
+   that origin. If not, it falls back to `PANKOSMIA_PUBLIC_ORIGIN`.
+
+Each allowed origin must also be registered as a callback URL in
+the GitHub App settings (§3.1): add
+`https://<origin>/auth/callback` for each one. GitHub Apps support
+multiple callback URLs.
+
+The `Secure` cookie flag is set to `true` if any configured origin
+(in either env var) uses `https://`.
 
 ---
 
@@ -258,6 +294,7 @@ right.
 ```
 STORAGE_BACKEND=github
 PANKOSMIA_PUBLIC_ORIGIN=https://<your-service>.up.railway.app
+PANKOSMIA_ALLOWED_ORIGINS=https://<netlify-app>.netlify.app   # optional; add if proxied from other origins (see §3.3)
 GITHUB_WEBHOOK_SECRET=<long random string; same value used to register repo webhooks>
 
 # GitHub App — identity (App's OAuth credentials section)
