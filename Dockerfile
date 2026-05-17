@@ -75,7 +75,8 @@ EXPOSE 19119
 ENV ROCKET_ADDRESS=0.0.0.0 \
     ROCKET_PORT=19119 \
     APP_RESOURCES_DIR=/app/app_resources/ \
-    PANKOSMIA_CATALOG_PATH=/app/catalog/languages.yaml
+    PANKOSMIA_CATALOG_PATH=/app/catalog/languages.yaml \
+    PANKOSMIA_I18N_TEMPLATE=/app/app_resources/templates/i18n.json
 
 # `PORT` from the PaaS (Railway, Fly.io, etc.) is bridged to
 # ROCKET_PORT inside main(); the EXPOSE directive's 19119 is the

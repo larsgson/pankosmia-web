@@ -21,6 +21,7 @@ next** (the implementation specs under `impl/`).
 | `SECURITY.md` | Threat model + defenses. Auth, ACLs, path traversal, edit-spam mitigation. |
 | `DATA_MODEL.md` | Entity catalog: who lives where, who owns what. |
 | `SCALING.md` | Capacity planning, per-language locks, blocking pools, SSE fan-out. |
+| `API_ROUTES.md` | Complete HTTP endpoint reference. Every route, method, path, and purpose. Use for proxy config and client integration. |
 
 ### Architecture decisions (the why)
 

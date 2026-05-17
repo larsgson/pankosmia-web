@@ -167,6 +167,25 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
         Err(e) => panic!("Could not create temp directory: {}", e),
     }
 
+    // Seed i18n data from a template file. In the hosted deployment
+    // clients live on Netlify and can't contribute their i18n at
+    // build time, so we bake a complete i18n.json and copy it into
+    // the working dir on every boot.
+    if let Ok(src) = env::var("PANKOSMIA_I18N_TEMPLATE") {
+        let dest = format!("{}{}i18n.json", &working_dir_path, os_slash_str());
+        if Path::new(&src).is_file() {
+            match std::fs::copy(&src, &dest) {
+                Ok(_) => println!("i18n: loaded from {}", src),
+                Err(e) => eprintln!(
+                    "WARN: could not copy i18n template {} → {}: {}",
+                    src, dest, e
+                ),
+            }
+        } else {
+            eprintln!("WARN: PANKOSMIA_I18N_TEMPLATE={} does not exist", src);
+        }
+    }
+
     // Load the config JSONs
     let (app_setup_json, user_settings_json, app_state_json) =
         load_configs(&working_dir_path, &launch_config);
