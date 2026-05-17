@@ -108,9 +108,7 @@ jobs:
       - name: Trigger Railway redeploy
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          npm install -g @railway/cli
-          railway redeploy --service "$RAILWAY_SERVICE_ID" --yes
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+          curl -sf https://backboard.railway.app/graphql/v2 \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -d '{"query":"mutation { serviceInstanceRedeploy(serviceId: \"0cf9e682-529f-41ea-8a34-140db527f84e\", environmentId: \"0a5e752d-5f0c-4dec-91db-9f4d8938e70f\") }"}'
