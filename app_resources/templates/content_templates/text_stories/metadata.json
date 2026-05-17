@@ -1,0 +1,593 @@
+{
+  "format": "scripture burrito",
+  "meta": {
+    "version": "1.0.0",
+    "category": "source",
+    "generator": {
+      "softwareName": "Pankosmia Web by MVH Solutions",
+      "softwareVersion": "0.0.1",
+      "userName": "A Pankosmia Web User"
+    },
+    "defaultLocale": "en",
+    "dateCreated": "%%CREATED_TIMESTAMP%%",
+    "normalization": "NFC"
+  },
+  "idAuthorities": {
+    "local": {
+      "id": "http://_local_",
+      "name": {
+        "en": "Local Project"
+      }
+    }
+  },
+  "identification": {
+    "primary": {
+      "local": {
+        "%%ABBR%%": {
+          "revision": "1",
+          "timestamp": "%%CREATED_TIMESTAMP%%"
+        }
+      }
+    },
+    "name": {
+      "en": "%%CONTENT_NAME%%"
+    },
+    "description": {
+      "en": "%%CONTENT_NAME%%"
+    },
+    "abbreviation": {
+      "en": "%%ABBR%%"
+    }
+  },
+  "confidential": false,
+  "type": {
+    "flavorType": {
+      "name": "gloss",
+      "flavor": {
+        "name": "textStories"
+      },
+      "currentScope": {
+        "GEN": [
+          "1-2",
+          "3",
+          "6-8",
+          "11-15",
+          "16-22",
+          "24:1-25:26",
+          "25:27-35:29",
+          "37-50",
+          "3:15",
+          "12:1-3",
+          "1-3",
+          "6",
+          "14",
+          "22"
+        ],
+        "EXO": [
+          "1-4",
+          "5-10",
+          "11:1-12:32",
+          "12:33-15:21",
+          "19-34",
+          "16-17",
+          "12",
+          "20"
+        ],
+        "NUM": ["10-14", "20", "27"],
+        "DEU": ["34", "18:15"],
+        "JOS": ["1-24"],
+        "JDG": ["1-3", "6-8"],
+        "1SA": ["1-10", "10", "15-19", "24", "31"],
+        "2SA": ["5", "7", "11-12"],
+        "1KI": ["1-6", "11-12", "16-18"],
+        "2KI": ["5", "17", "24-25"],
+        "JER": ["38", "31"],
+        "2CH": ["36"],
+        "EZR": ["1-10"],
+        "NEH": ["1-13"],
+        "ISA": ["59:16", "7:14", "9:1-7", "35:3-5", "61", "53", "50:6"],
+        "DAN": ["7"],
+        "MAL": ["4:5"],
+        "MIC": ["5:2"],
+        "PSA": ["22:18", "35:19", "69:4", "41:9", "16:10-11"],
+        "ZEC": ["11:12-13"],
+        "LUK": [
+          "1",
+          "2",
+          "3:1-23",
+          "4:1-13",
+          "4:14-30",
+          "38-44",
+          "10:25-37",
+          "18:18-30",
+          "9:10-17",
+          "8:26-39",
+          "8:42-48",
+          "8:4-15",
+          "13:18-21",
+          "18:9-14",
+          "15:11-32",
+          "9:28-36",
+          "22:1-53",
+          "22:54-23:25",
+          "23:26-56",
+          "24:1-12",
+          "24:13-53"
+        ],
+        "MAT": [
+          "1",
+          "3",
+          "4:1-11",
+          "4:12-25",
+          "19:16-30",
+          "18:21-35",
+          "14:13-21",
+          "14:22-33",
+          "8:28-34",
+          "9:20-22",
+          "13:1-8",
+          "18-23",
+          "13:31-33",
+          "44-46",
+          "17:1-9",
+          "26:14-56",
+          "26:57-27:26",
+          "27:27-61",
+          "27:62-28:15",
+          "28:16-20",
+          "24:14",
+          "28:18",
+          "13:24-30",
+          "13:36-42",
+          "22:13"
+        ],
+        "MRK": [
+          "1:9-11",
+          "1:12-13",
+          "1:14-15",
+          "35-39",
+          "3:13-21",
+          "10:17-31",
+          "6:31-44",
+          "6:45-52",
+          "5:1-20",
+          "5:24-34",
+          "4:1-8",
+          "13-20",
+          "4:30-32",
+          "9:2-8",
+          "14:10-50",
+          "14:53-15:15",
+          "15:16-47",
+          "16:1-11",
+          "16:12-20",
+          "16:16"
+        ],
+        "JHN": [
+          "6:5-15",
+          "6:16-21",
+          "11:1-46",
+          "12:6",
+          "18:1-11",
+          "18:12-19:16",
+          "19:17-42",
+          "20:1-18",
+          "20:19-23",
+          "3:16",
+          "15:20",
+          "16:33"
+        ],
+        "ACT": [
+          "1:1-11",
+          "2",
+          "3:1-4:22",
+          "6:8-8:5",
+          "8:26-40",
+          "8:3",
+          "9:1-31",
+          "11:19-26",
+          "13:1-3",
+          "16:11-40"
+        ],
+        "HEB": ["3:1-6", "4:14-5:10", "7:1-8:13", "9:11-10:18"],
+        "REV": ["21", "2:10", "20:10", "21:1-22:21"],
+        "ROM": ["3:21-26", "5:1-11"],
+        "COL": ["1:13-14"],
+        "2CO": ["5:17-21"],
+        "1JN": ["1:5-10"],
+        "1TH": ["4:13-5:11"],
+        "JAS": ["1:12"]
+      }
+    }
+  },
+  "languages": [
+    %%LANGUAGE%%
+  ],
+  "copyright": {
+    "shortStatements": [
+      {
+        "statement": "Copyright © 2019 by unfoldingWord"
+      }
+    ]
+  },
+  "ingredients": {
+    "LICENSE.md": {
+      "checksum": {
+        "md5": "3dcfc643a1788e15b7e61e1442c9e2f3"
+      },
+      "mimeType": "text/markdown",
+      "size": 1195
+    },
+    "content/01.md": {
+      "checksum": {
+        "md5": "ec1795a51a752f633146f58888d7e4ee"
+      },
+      "mimeType": "text/markdown",
+      "size": 1157
+    },
+    "content/02.md": {
+      "checksum": {
+        "md5": "04faef41a0d4941e04eee20419466d33"
+      },
+      "mimeType": "text/markdown",
+      "size": 881
+    },
+    "content/03.md": {
+      "checksum": {
+        "md5": "113e2fc50f0152ffd36e0e002f027897"
+      },
+      "mimeType": "text/markdown",
+      "size": 1154
+    },
+    "content/04.md": {
+      "checksum": {
+        "md5": "943b3509ff15297d1798f538ea4dce1f"
+      },
+      "mimeType": "text/markdown",
+      "size": 675
+    },
+    "content/05.md": {
+      "checksum": {
+        "md5": "291f8cdb95efb6b2d1063dd343ae1a0a"
+      },
+      "mimeType": "text/markdown",
+      "size": 737
+    },
+    "content/06.md": {
+      "checksum": {
+        "md5": "818ee4cca1d4926cf76215fd6ef8e125"
+      },
+      "mimeType": "text/markdown",
+      "size": 528
+    },
+    "content/07.md": {
+      "checksum": {
+        "md5": "04db2d6c16ca55f2ad9dc5c0b072bfa6"
+      },
+      "mimeType": "text/markdown",
+      "size": 736
+    },
+    "content/08.md": {
+      "checksum": {
+        "md5": "ce3c52b4780d6e503ab02ece0904035e"
+      },
+      "mimeType": "text/markdown",
+      "size": 1105
+    },
+    "content/09.md": {
+      "checksum": {
+        "md5": "f6b289d99d724860b4941e0d6e222c88"
+      },
+      "mimeType": "text/markdown",
+      "size": 1089
+    },
+    "content/10.md": {
+      "checksum": {
+        "md5": "a1c77293b3a701b3611a4db636ffc911"
+      },
+      "mimeType": "text/markdown",
+      "size": 877
+    },
+    "content/11.md": {
+      "checksum": {
+        "md5": "37f9078f3b6f4677fc8f7b32545ef6ce"
+      },
+      "mimeType": "text/markdown",
+      "size": 590
+    },
+    "content/12.md": {
+      "checksum": {
+        "md5": "e1dc26ea3f88fb808f148c88f7fad58a"
+      },
+      "mimeType": "text/markdown",
+      "size": 1014
+    },
+    "content/13.md": {
+      "checksum": {
+        "md5": "b0f4000e57479fb76e85ca6130219962"
+      },
+      "mimeType": "text/markdown",
+      "size": 1101
+    },
+    "content/14.md": {
+      "checksum": {
+        "md5": "324fb189b52f6070b6297c5f1b6ea937"
+      },
+      "mimeType": "text/markdown",
+      "size": 1102
+    },
+    "content/15.md": {
+      "checksum": {
+        "md5": "88ae9f650911064f9239392ff91148ec"
+      },
+      "mimeType": "text/markdown",
+      "size": 950
+    },
+    "content/16.md": {
+      "checksum": {
+        "md5": "b66cc5146f2344a6d228de834c68bee1"
+      },
+      "mimeType": "text/markdown",
+      "size": 1302
+    },
+    "content/17.md": {
+      "checksum": {
+        "md5": "57c2ccd77098b74ac6489bca4859c71b"
+      },
+      "mimeType": "text/markdown",
+      "size": 1029
+    },
+    "content/18.md": {
+      "checksum": {
+        "md5": "8635c752478836a81ba48ea64d8f91ae"
+      },
+      "mimeType": "text/markdown",
+      "size": 952
+    },
+    "content/19.md": {
+      "checksum": {
+        "md5": "eab2b360bf3c839133931024522133e0"
+      },
+      "mimeType": "text/markdown",
+      "size": 1300
+    },
+    "content/20.md": {
+      "checksum": {
+        "md5": "b761c2d90efdf09e022402c975391bd2"
+      },
+      "mimeType": "text/markdown",
+      "size": 953
+    },
+    "content/21.md": {
+      "checksum": {
+        "md5": "05520a7986494a32e7cbcc3c7fa35b8d"
+      },
+      "mimeType": "text/markdown",
+      "size": 1099
+    },
+    "content/22.md": {
+      "checksum": {
+        "md5": "a6b39c5954ff0d9bf9e983e5c3497f34"
+      },
+      "mimeType": "text/markdown",
+      "size": 524
+    },
+    "content/23.md": {
+      "checksum": {
+        "md5": "4492570eeadd3b8fe050db3dafc8ab29"
+      },
+      "mimeType": "text/markdown",
+      "size": 738
+    },
+    "content/24.md": {
+      "checksum": {
+        "md5": "f8df2cac4305855dbeee49e7dc62298f"
+      },
+      "mimeType": "text/markdown",
+      "size": 668
+    },
+    "content/25.md": {
+      "checksum": {
+        "md5": "29caadad595e9e97a5ba23aca483bda1"
+      },
+      "mimeType": "text/markdown",
+      "size": 596
+    },
+    "content/26.md": {
+      "checksum": {
+        "md5": "1880fe8bc0c8048550b7fe367d51056c"
+      },
+      "mimeType": "text/markdown",
+      "size": 745
+    },
+    "content/27.md": {
+      "checksum": {
+        "md5": "879da5c106e5a166f72d11197133c18c"
+      },
+      "mimeType": "text/markdown",
+      "size": 822
+    },
+    "content/28.md": {
+      "checksum": {
+        "md5": "2bed55735c1ac3c32051393641ab4699"
+      },
+      "mimeType": "text/markdown",
+      "size": 740
+    },
+    "content/29.md": {
+      "checksum": {
+        "md5": "10058089f167cdce5a28d82af55bdbcc"
+      },
+      "mimeType": "text/markdown",
+      "size": 684
+    },
+    "content/30.md": {
+      "checksum": {
+        "md5": "5af6998f42d5e9a8272da3bf3d3aff6e"
+      },
+      "mimeType": "text/markdown",
+      "size": 680
+    },
+    "content/31.md": {
+      "checksum": {
+        "md5": "5e7230094b3400f37ef6127f694b379b"
+      },
+      "mimeType": "text/markdown",
+      "size": 598
+    },
+    "content/32.md": {
+      "checksum": {
+        "md5": "5647b71bb3273cb8c11bc357f018f874"
+      },
+      "mimeType": "text/markdown",
+      "size": 1194
+    },
+    "content/33.md": {
+      "checksum": {
+        "md5": "0226bcc705d8599d864a863a71d33ef7"
+      },
+      "mimeType": "text/markdown",
+      "size": 672
+    },
+    "content/34.md": {
+      "checksum": {
+        "md5": "d5a529a380eef313c19133e786e0a7e8"
+      },
+      "mimeType": "text/markdown",
+      "size": 747
+    },
+    "content/35.md": {
+      "checksum": {
+        "md5": "a8aa440d14c78c0154192dd5f8c1fd83"
+      },
+      "mimeType": "text/markdown",
+      "size": 970
+    },
+    "content/36.md": {
+      "checksum": {
+        "md5": "83bce671446987e5187c72190b221f4c"
+      },
+      "mimeType": "text/markdown",
+      "size": 526
+    },
+    "content/37.md": {
+      "checksum": {
+        "md5": "394b317e412db7bd79437ef7b316b3c0"
+      },
+      "mimeType": "text/markdown",
+      "size": 825
+    },
+    "content/38.md": {
+      "checksum": {
+        "md5": "8047fade6941acae152549462cda9a4e"
+      },
+      "mimeType": "text/markdown",
+      "size": 1092
+    },
+    "content/39.md": {
+      "checksum": {
+        "md5": "46a0cafd84effd29433f0988984d095d"
+      },
+      "mimeType": "text/markdown",
+      "size": 883
+    },
+    "content/40.md": {
+      "checksum": {
+        "md5": "a58de9ae5b772cf90f00d55e87c0236a"
+      },
+      "mimeType": "text/markdown",
+      "size": 667
+    },
+    "content/41.md": {
+      "checksum": {
+        "md5": "1dc8625e15ff2594df8a6c2c1a1ccf32"
+      },
+      "mimeType": "text/markdown",
+      "size": 608
+    },
+    "content/42.md": {
+      "checksum": {
+        "md5": "5f64ae247d8824feccd58f7628aa48ce"
+      },
+      "mimeType": "text/markdown",
+      "size": 814
+    },
+    "content/43.md": {
+      "checksum": {
+        "md5": "29a3152fce15b28643aa415dedf90616"
+      },
+      "mimeType": "text/markdown",
+      "size": 950
+    },
+    "content/44.md": {
+      "checksum": {
+        "md5": "c23c4200f80bcf3a2bb5add0a11dfc15"
+      },
+      "mimeType": "text/markdown",
+      "size": 677
+    },
+    "content/45.md": {
+      "checksum": {
+        "md5": "897f9f678aedfeb1c3aa2a9e9d97b9b0"
+      },
+      "mimeType": "text/markdown",
+      "size": 951
+    },
+    "content/46.md": {
+      "checksum": {
+        "md5": "ecaeed7c064fe6f3670867a5a3bf7cff"
+      },
+      "mimeType": "text/markdown",
+      "size": 752
+    },
+    "content/47.md": {
+      "checksum": {
+        "md5": "d102f6ee945b379100a9c9e746a12e97"
+      },
+      "mimeType": "text/markdown",
+      "size": 1030
+    },
+    "content/48.md": {
+      "checksum": {
+        "md5": "00ebf5d912853654dafe14bfc5f10ee6"
+      },
+      "mimeType": "text/markdown",
+      "size": 1033
+    },
+    "content/49.md": {
+      "checksum": {
+        "md5": "2b181e936692395135a9a9d44b0f4c81"
+      },
+      "mimeType": "text/markdown",
+      "size": 1306
+    },
+    "content/50.md": {
+      "checksum": {
+        "md5": "ed15caf7fd7149f1c2a6019712876365"
+      },
+      "mimeType": "text/markdown",
+      "size": 1230
+    },
+    "content/back/intro.md": {
+      "checksum": {
+        "md5": "591705d71f222da55287962532b76f43"
+      },
+      "mimeType": "text/markdown",
+      "size": 906
+    },
+    "content/front/intro.md": {
+      "checksum": {
+        "md5": "dd03aa14315c06b1c417dd46e0c1927d"
+      },
+      "mimeType": "text/markdown",
+      "size": 2134
+    },
+    "content/front/title.md": {
+      "checksum": {
+        "md5": "2de95f95a36868c91e0eb3c66671e007"
+      },
+      "mimeType": "text/markdown",
+      "size": 34
+    }
+  }
+  }
