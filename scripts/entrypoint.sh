@@ -15,6 +15,7 @@ set -e
 
 if [ "$(id -u)" = "0" ]; then
     chown -R pankosmia:pankosmia /data 2>/dev/null || true
+    export HOME=/home/pankosmia
     exec setpriv \
         --reuid=pankosmia \
         --regid=pankosmia \
