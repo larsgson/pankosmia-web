@@ -51,66 +51,82 @@ pub async fn flat_i18n(
             subtype_filter = Some(filter_items[1].clone());
         }
     }
-    match std::fs::read_to_string(path_to_serve) {
-        Ok(v) => {
-            match serde_json::from_str::<Value>(v.as_str()) {
-                Ok(sj) => {
-                    let languages = state.languages.lock().unwrap().clone();
-                    let mut flat = Map::new();
-                    for (i18n_type, subtypes) in sj.as_object().unwrap() {
-                        // println!("{}", i18n_type);
-                        match type_filter.clone() {
-                            Some(v) => {
-                                if v != *i18n_type {
-                                    continue;
-                                }
-                            }
-                            None => {}
-                        }
-                        for (i18n_subtype, terms) in subtypes.as_object().unwrap() {
-                            // println!("   {}", i18n_subtype);
-                            match subtype_filter.clone() {
-                                Some(v) => {
-                                    if v != *i18n_subtype {
-                                        continue;
-                                    }
-                                }
-                                None => {}
-                            }
-                            for (i18n_term, term_languages) in terms.as_object().unwrap() {
-                                'user_lang: for user_language in languages.clone() {
-                                    for (i18n_language, translation) in
-                                        term_languages.as_object().unwrap()
-                                    {
-                                        // println!("{} {}", i18n_language, languages[0]);
-                                        if *i18n_language == user_language {
-                                            let flat_key = format!(
-                                                "{}:{}:{}",
-                                                i18n_type.clone(),
-                                                i18n_subtype.clone(),
-                                                i18n_term.clone()
-                                            );
-                                            flat.insert(flat_key, translation.clone());
-                                            break 'user_lang;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    ok_json_response(serde_json::to_string(&flat).unwrap())
-                }
-                Err(e) => not_ok_json_response(
-                    Status::BadRequest,
-                    make_bad_json_data_response(
-                        format!("could not parse for flat i18n: {}", e).to_string(),
-                    ),
-                ),
+    let file_content = match std::fs::read_to_string(path_to_serve) {
+        Ok(v) => v,
+        Err(e) => {
+            return not_ok_json_response(
+                Status::BadRequest,
+                make_bad_json_data_response(format!("could not read for flat i18n: {}", e)),
+            );
+        }
+    };
+    let sj = match serde_json::from_str::<Value>(file_content.as_str()) {
+        Ok(v) => v,
+        Err(e) => {
+            return not_ok_json_response(
+                Status::BadRequest,
+                make_bad_json_data_response(format!("could not parse for flat i18n: {}", e)),
+            );
+        }
+    };
+    let top = match sj.as_object() {
+        Some(v) => v,
+        None => {
+            return not_ok_json_response(
+                Status::BadRequest,
+                make_bad_json_data_response("i18n.json top level is not an object".to_string()),
+            );
+        }
+    };
+    let languages = match state.languages.lock() {
+        Ok(v) => v.clone(),
+        Err(e) => {
+            return not_ok_json_response(
+                Status::InternalServerError,
+                make_bad_json_data_response(format!("could not lock languages: {}", e)),
+            );
+        }
+    };
+    let mut flat = Map::new();
+    for (i18n_type, subtypes) in top {
+        if let Some(ref v) = type_filter {
+            if v != i18n_type {
+                continue;
             }
         }
-        Err(e) => not_ok_json_response(
-            Status::BadRequest,
-            make_bad_json_data_response(format!("could not read for flat i18n: {}", e).to_string()),
-        ),
+        let subtypes_obj = match subtypes.as_object() {
+            Some(v) => v,
+            None => continue,
+        };
+        for (i18n_subtype, terms) in subtypes_obj {
+            if let Some(ref v) = subtype_filter {
+                if v != i18n_subtype {
+                    continue;
+                }
+            }
+            let terms_obj = match terms.as_object() {
+                Some(v) => v,
+                None => continue,
+            };
+            for (i18n_term, term_languages) in terms_obj {
+                let lang_obj = match term_languages.as_object() {
+                    Some(v) => v,
+                    None => continue,
+                };
+                'user_lang: for user_language in &languages {
+                    for (i18n_language, translation) in lang_obj {
+                        if i18n_language == user_language {
+                            let flat_key = format!(
+                                "{}:{}:{}",
+                                i18n_type, i18n_subtype, i18n_term
+                            );
+                            flat.insert(flat_key, translation.clone());
+                            break 'user_lang;
+                        }
+                    }
+                }
+            }
+        }
     }
+    ok_json_response(serde_json::to_string(&flat).unwrap())
 }

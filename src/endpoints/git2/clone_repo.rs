@@ -1,3 +1,4 @@
+use crate::gitea::{resolve_read_source, CuratedOrgs, ReadSource};
 use crate::server::{git_dispatch, BlockingPools, LanguageLocks};
 use crate::static_vars::NET_IS_ENABLED;
 use crate::store::SharedProjectStore;
@@ -20,11 +21,15 @@ use std::sync::atomic::Ordering;
 pub async fn clone_repo(
     state: &State<AppSettings>,
     store: &State<SharedProjectStore>,
+    curated: &State<CuratedOrgs>,
     locks: &State<LanguageLocks>,
     pools: &State<BlockingPools>,
     repo_path: PathBuf,
     branch: Option<String>,
 ) -> status::Custom<(ContentType, String)> {
+    if matches!(resolve_read_source(curated, &repo_path), ReadSource::Gitea(_)) {
+        return ok_ok_json_response();
+    }
     if !NET_IS_ENABLED.load(Ordering::Relaxed) {
         return not_ok_offline_json_response();
     }

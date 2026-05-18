@@ -1,3 +1,4 @@
+use crate::gitea::{resolve_read_source, CuratedOrgs, ReadSource};
 use crate::server::{git_dispatch, BlockingPools, LanguageLocks};
 use crate::static_vars::NET_IS_ENABLED;
 use crate::store::SharedProjectStore;
@@ -70,11 +71,23 @@ fn normal_merge(
 pub async fn pull_repo(
     state: &State<AppSettings>,
     store: &State<SharedProjectStore>,
+    curated: &State<CuratedOrgs>,
     locks: &State<LanguageLocks>,
     pools: &State<BlockingPools>,
     remote_name: &str,
     repo_path: PathBuf,
 ) -> status::Custom<(ContentType, String)> {
+    if matches!(resolve_read_source(curated, &repo_path), ReadSource::Gitea(_)) {
+        return ok_json_response(
+            serde_json::to_string(&json!({
+                "is_good": true,
+                "reason": "ok",
+                "merge_type": "up-to-date",
+                "has_conflicts": false,
+            }))
+            .unwrap(),
+        );
+    }
     if !check_path_components(&mut repo_path.components().clone()) {
         return not_ok_bad_repo_json_response();
     }

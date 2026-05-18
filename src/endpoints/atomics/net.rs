@@ -33,7 +33,6 @@ pub fn net_enable(msgs: &State<MsgQueue>) -> status::Custom<(ContentType, String
     msgs.lock()
         .unwrap()
         .push_back("info--5--net--enable".to_string());
-    NET_IS_ENABLED.store(true, Ordering::Relaxed);
     ok_ok_json_response()
 }
 
@@ -41,14 +40,12 @@ pub fn net_enable(msgs: &State<MsgQueue>) -> status::Custom<(ContentType, String
 ///
 /// Typically mounted as **`/net/disable`**
 ///
-/// Disables net state, returns a JSON OK response and generates an SSE notification.
-///
-/// `{"is_good":true,"reason":"ok"}`
+/// No-op: always-online mode. Returns OK and sends SSE notification
+/// but does not toggle the atomic.
 #[post("/disable")]
 pub fn net_disable(msgs: &State<MsgQueue>) -> status::Custom<(ContentType, String)> {
     msgs.lock()
         .unwrap()
         .push_back("info--5--net--disable".to_string());
-    NET_IS_ENABLED.store(false, Ordering::Relaxed);
     ok_ok_json_response()
 }

@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 
 pub mod auth;
 pub mod catalog;
+pub mod gitea;
 pub mod identity;
 pub mod server;
 pub mod store;
@@ -426,6 +427,12 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
             }
         };
     my_rocket = my_rocket.manage(app_auth_option);
+
+    // Gitea read-proxy: curated orgs, HTTP client, response cache.
+    my_rocket = my_rocket
+        .manage(crate::gitea::CuratedOrgs::from_env())
+        .manage(crate::gitea::GiteaProxyClient::new())
+        .manage(crate::gitea::GiteaCache::new());
 
     // Webhook secret for GitHub webhooks (G2). Empty when not
     // configured; webhook endpoints fail with 503 in that case.

@@ -12,19 +12,8 @@ use std::io;
 use std::path::Path;
 use walkdir::WalkDir;
 
-pub(crate) fn summary_metadata_from_file(
-    repo_metadata_path: String,
-) -> Result<MetadataSummary, io::Error> {
-    let file_string = match fs::read_to_string(&repo_metadata_path) {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
-    let raw_metadata_struct: Value = match serde_json::from_str(file_string.as_str()) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(io::Error::from(e));
-        }
-    };
+pub(crate) fn summary_metadata_from_str(json_str: &str) -> Result<MetadataSummary, io::Error> {
+    let raw_metadata_struct: Value = serde_json::from_str(json_str).map_err(io::Error::from)?;
     let current_scope_values =
         match raw_metadata_struct["type"]["flavorType"]["currentScope"].as_object() {
             Some(v) => v,
@@ -37,7 +26,7 @@ pub(crate) fn summary_metadata_from_file(
     Ok(MetadataSummary {
         name: raw_metadata_struct["identification"]["name"]["en"]
             .as_str()
-            .unwrap()
+            .unwrap_or("?")
             .to_string(),
         description: match raw_metadata_struct["identification"]["description"]["en"].clone() {
             Value::String(v) => v.as_str().to_string(),
@@ -56,33 +45,42 @@ pub(crate) fn summary_metadata_from_file(
         },
         flavor_type: raw_metadata_struct["type"]["flavorType"]["name"]
             .as_str()
-            .unwrap()
+            .unwrap_or("?")
             .to_string(),
         flavor: raw_metadata_struct["type"]["flavorType"]["flavor"]["name"]
             .as_str()
-            .unwrap()
+            .unwrap_or("?")
             .to_string(),
         language_code: raw_metadata_struct["languages"][0]["tag"]
             .as_str()
-            .unwrap()
+            .unwrap_or("?")
             .to_string(),
         language_name: raw_metadata_struct["languages"][0]["name"]["en"]
             .as_str()
-            .unwrap()
+            .unwrap_or("?")
             .to_string(),
         script_direction: match raw_metadata_struct["languages"][0]["scriptDirection"].clone() {
             Value::String(v) => v.as_str().to_string(),
             _ => "?".to_string(),
         },
-        book_codes: book_codes,
-        timestamp: fs::metadata(&repo_metadata_path)
-            .expect("Could not read fs metadata")
-            .modified()
-            .expect("Could not get modified for fs")
-            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .expect("Could not get elapsed")
-            .as_secs(),
+        book_codes,
+        timestamp: 0,
     })
+}
+
+pub(crate) fn summary_metadata_from_file(
+    repo_metadata_path: String,
+) -> Result<MetadataSummary, io::Error> {
+    let file_string = fs::read_to_string(&repo_metadata_path)?;
+    let mut summary = summary_metadata_from_str(&file_string)?;
+    summary.timestamp = fs::metadata(&repo_metadata_path)
+        .expect("Could not read fs metadata")
+        .modified()
+        .expect("Could not get modified for fs")
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .expect("Could not get elapsed")
+        .as_secs();
+    Ok(summary)
 }
 
 pub(crate) fn destination_parent(destination: String) -> String {

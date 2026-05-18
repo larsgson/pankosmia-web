@@ -132,7 +132,7 @@ pub struct GitStatusRecord {
     pub change_type: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MetadataSummary {
     pub name: String,
     pub description: String,

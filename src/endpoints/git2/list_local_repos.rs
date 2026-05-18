@@ -1,31 +1,38 @@
+use crate::gitea::{GiteaProxyClient, CuratedOrgs};
 use crate::store::SharedProjectStore;
 use crate::utils::response::ok_json_response;
 use rocket::http::ContentType;
 use rocket::response::status;
 use rocket::{get, State};
+use std::collections::BTreeSet;
 
-/// *`GET /list-local-repos`*
-///
-/// Typically mounted as **`/git/list-local-repos`**
-///
-/// Returns a JSON array of local repo paths in the legacy
-/// `<source>/<org>/<name>` form.
-///
-/// Walks the workspace root from the `ProjectStore` (M3) instead of
-/// reaching directly into `state.repo_dir`. The reserved
-/// `.pankosmia/` directory is skipped naturally because it
-/// dot-prefixes — same predicate the original code used. Once the
-/// hosted Phase 2 backend lands, this enumeration moves into the
-/// trait so endpoints don't read the FS at all.
 #[get("/list-local-repos")]
-pub fn list_local_repos(
+pub async fn list_local_repos(
     store: &State<SharedProjectStore>,
+    curated: &State<CuratedOrgs>,
+    client: &State<GiteaProxyClient>,
 ) -> status::Custom<(ContentType, String)> {
+    let mut repos: BTreeSet<String> = BTreeSet::new();
+
+    // Curated orgs: list from Gitea API
+    for (server, org) in curated.iter_orgs() {
+        if let Ok(org_repos) = client.list_org_repos(server, org).await {
+            for repo_val in &org_repos {
+                if let Some(name) = repo_val.get("name").and_then(|n| n.as_str()) {
+                    repos.insert(format!("{}/{}/{}", server, org, name));
+                }
+            }
+        }
+    }
+
+    // Local filesystem walk
     let root = store.workspace_root().to_path_buf();
-    let mut repos: Vec<String> = Vec::new();
     let server_paths = match std::fs::read_dir(&root) {
         Ok(p) => p,
-        Err(_) => return ok_json_response("[]".to_string()),
+        Err(_) => {
+            let repos_vec: Vec<String> = repos.into_iter().collect();
+            return ok_json_response(serde_json::to_string(&repos_vec).unwrap());
+        }
     };
     for server_path in server_paths {
         let uw_server_path = match server_path {
@@ -36,10 +43,7 @@ pub fn list_local_repos(
             Some(n) => n.to_string_lossy().into_owned(),
             None => continue,
         };
-        if server_leaf.starts_with('.') {
-            continue;
-        }
-        if !uw_server_path.is_dir() {
+        if server_leaf.starts_with('.') || !uw_server_path.is_dir() {
             continue;
         }
         let org_iter = match std::fs::read_dir(&uw_server_path) {
@@ -55,10 +59,7 @@ pub fn list_local_repos(
                 Some(n) => n.to_string_lossy().into_owned(),
                 None => continue,
             };
-            if org_leaf.starts_with('.') {
-                continue;
-            }
-            if !uw_org_path.is_dir() {
+            if org_leaf.starts_with('.') || !uw_org_path.is_dir() {
                 continue;
             }
             let server_org = format!("{}/{}", server_leaf, org_leaf);
@@ -66,6 +67,10 @@ pub fn list_local_repos(
                 || server_org == "_local_/_archive_"
                 || server_org == "_local_/_updates_"
             {
+                continue;
+            }
+            // Skip curated orgs (already fetched from Gitea)
+            if curated.is_curated(&server_org) {
                 continue;
             }
             let repo_iter = match std::fs::read_dir(&uw_org_path) {
@@ -81,15 +86,13 @@ pub fn list_local_repos(
                     Some(n) => n.to_string_lossy().into_owned(),
                     None => continue,
                 };
-                if repo_leaf.starts_with('.') {
+                if repo_leaf.starts_with('.') || !uw_repo_path.is_dir() {
                     continue;
                 }
-                if !uw_repo_path.is_dir() {
-                    continue;
-                }
-                repos.push(format!("{}/{}/{}", server_leaf, org_leaf, repo_leaf));
+                repos.insert(format!("{}/{}/{}", server_leaf, org_leaf, repo_leaf));
             }
         }
     }
-    ok_json_response(serde_json::to_string(&repos).unwrap())
+    let repos_vec: Vec<String> = repos.into_iter().collect();
+    ok_json_response(serde_json::to_string(&repos_vec).unwrap())
 }
