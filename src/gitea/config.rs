@@ -26,7 +26,10 @@ impl CuratedOrgs {
         if entries.is_empty() {
             println!("curated_orgs: none configured (PANKOSMIA_CURATED_ORGS unset)");
         } else {
-            println!("curated_orgs: {}", entries.iter().cloned().collect::<Vec<_>>().join(", "));
+            println!(
+                "curated_orgs: {}",
+                entries.iter().cloned().collect::<Vec<_>>().join(", ")
+            );
         }
         Self { entries }
     }

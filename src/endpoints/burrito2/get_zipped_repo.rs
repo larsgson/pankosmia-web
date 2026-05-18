@@ -1,4 +1,4 @@
-use crate::gitea::{resolve_read_source, GiteaProxyClient, CuratedOrgs, ReadSource};
+use crate::gitea::{resolve_read_source, CuratedOrgs, GiteaProxyClient, ReadSource};
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::structs::BytesOrError;
@@ -20,13 +20,21 @@ pub async fn get_zipped_repo(
 ) -> status::Custom<(ContentType, BytesOrError)> {
     match resolve_read_source(curated, &repo_path) {
         ReadSource::Gitea(parsed) => {
-            match client.fetch_archive(&parsed.server, &parsed.org, &parsed.repo, "master").await {
-                Ok(bytes) => status::Custom(Status::Ok, (ContentType::ZIP, BytesOrError::Bytes(bytes))),
+            match client
+                .fetch_archive(&parsed.server, &parsed.org, &parsed.repo, "master")
+                .await
+            {
+                Ok(bytes) => {
+                    status::Custom(Status::Ok, (ContentType::ZIP, BytesOrError::Bytes(bytes)))
+                }
                 Err(e) => status::Custom(
                     Status::BadGateway,
                     (
                         ContentType::JSON,
-                        BytesOrError::Error(make_bad_json_data_response(format!("gitea proxy: {}", e))),
+                        BytesOrError::Error(make_bad_json_data_response(format!(
+                            "gitea proxy: {}",
+                            e
+                        ))),
                     ),
                 ),
             }
@@ -70,7 +78,9 @@ pub async fn get_zipped_repo(
                     Status::BadRequest,
                     (
                         ContentType::JSON,
-                        BytesOrError::Error(make_bad_json_data_response("bad repo path".to_string())),
+                        BytesOrError::Error(make_bad_json_data_response(
+                            "bad repo path".to_string(),
+                        )),
                     ),
                 )
             }

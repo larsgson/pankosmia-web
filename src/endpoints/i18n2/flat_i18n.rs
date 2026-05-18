@@ -116,10 +116,7 @@ pub async fn flat_i18n(
                 'user_lang: for user_language in &languages {
                     for (i18n_language, translation) in lang_obj {
                         if i18n_language == user_language {
-                            let flat_key = format!(
-                                "{}:{}:{}",
-                                i18n_type, i18n_subtype, i18n_term
-                            );
+                            let flat_key = format!("{}:{}:{}", i18n_type, i18n_subtype, i18n_term);
                             flat.insert(flat_key, translation.clone());
                             break 'user_lang;
                         }

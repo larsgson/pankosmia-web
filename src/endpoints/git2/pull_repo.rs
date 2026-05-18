@@ -77,7 +77,10 @@ pub async fn pull_repo(
     remote_name: &str,
     repo_path: PathBuf,
 ) -> status::Custom<(ContentType, String)> {
-    if matches!(resolve_read_source(curated, &repo_path), ReadSource::Gitea(_)) {
+    if matches!(
+        resolve_read_source(curated, &repo_path),
+        ReadSource::Gitea(_)
+    ) {
         return ok_json_response(
             serde_json::to_string(&json!({
                 "is_good": true,

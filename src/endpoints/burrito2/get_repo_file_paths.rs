@@ -1,4 +1,4 @@
-use crate::gitea::{resolve_read_source, GiteaProxyClient, GiteaCache, CuratedOrgs, ReadSource};
+use crate::gitea::{resolve_read_source, CuratedOrgs, GiteaCache, GiteaProxyClient, ReadSource};
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -29,16 +29,17 @@ pub async fn get_repo_file_paths(
                 return ok_json_response(serde_json::to_string(cached.as_ref()).unwrap());
             }
 
-            match client.list_tree(&parsed.server, &parsed.org, &parsed.repo, "master").await {
+            match client
+                .list_tree(&parsed.server, &parsed.org, &parsed.repo, "master")
+                .await
+            {
                 Ok(entries) => {
                     let paths: Vec<String> = entries
                         .iter()
                         .filter(|e| e.entry_type == "blob")
                         .filter_map(|e| e.path.strip_prefix("ingredients/").map(|s| s.to_string()))
                         .filter(|p| {
-                            !p.starts_with('.')
-                                && !p.ends_with(".bak")
-                                && !p.contains("/.")
+                            !p.starts_with('.') && !p.ends_with(".bak") && !p.contains("/.")
                         })
                         .collect();
                     cache.trees.insert(cache_key, Arc::new(paths.clone()));

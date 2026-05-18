@@ -1,4 +1,4 @@
-use crate::gitea::{resolve_read_source, GiteaProxyClient, CuratedOrgs, ReadSource};
+use crate::gitea::{resolve_read_source, CuratedOrgs, GiteaProxyClient, ReadSource};
 use crate::server::WatcherRegistry;
 use crate::store::SharedProjectStore;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -92,19 +92,17 @@ pub async fn raw_text_ingredient(
     }
     match resolve_read_source(curated, &repo_path) {
         ReadSource::Gitea(parsed) => {
-            match client.fetch_raw(&parsed.server, &parsed.org, &parsed.repo, &ipath, "master").await {
-                Ok((_content_type, bytes)) => {
-                    match String::from_utf8(bytes) {
-                        Ok(text) => status::Custom(
-                            Status::Ok,
-                            (guess_content_type(&ipath), text),
-                        ),
-                        Err(e) => not_ok_json_response(
-                            Status::BadRequest,
-                            make_bad_json_data_response(format!("not valid UTF-8: {}", e)),
-                        ),
-                    }
-                }
+            match client
+                .fetch_raw(&parsed.server, &parsed.org, &parsed.repo, &ipath, "master")
+                .await
+            {
+                Ok((_content_type, bytes)) => match String::from_utf8(bytes) {
+                    Ok(text) => status::Custom(Status::Ok, (guess_content_type(&ipath), text)),
+                    Err(e) => not_ok_json_response(
+                        Status::BadRequest,
+                        make_bad_json_data_response(format!("not valid UTF-8: {}", e)),
+                    ),
+                },
                 Err(e) => not_ok_json_response(
                     Status::BadGateway,
                     make_bad_json_data_response(format!("gitea proxy: {}", e)),
@@ -117,10 +115,7 @@ pub async fn raw_text_ingredient(
                 None => return not_ok_bad_repo_json_response(),
             };
             match std::fs::read_to_string(path_to_serve) {
-                Ok(v) => status::Custom(
-                    Status::Ok,
-                    (guess_content_type(&ipath), v),
-                ),
+                Ok(v) => status::Custom(Status::Ok, (guess_content_type(&ipath), v)),
                 Err(e) => not_ok_json_response(
                     Status::BadRequest,
                     make_bad_json_data_response(

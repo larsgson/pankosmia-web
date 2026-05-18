@@ -1,4 +1,4 @@
-use crate::gitea::{resolve_read_source, GiteaProxyClient, CuratedOrgs, ReadSource};
+use crate::gitea::{resolve_read_source, CuratedOrgs, GiteaProxyClient, ReadSource};
 use crate::store::SharedProjectStore;
 use crate::structs::{AppSettings, BytesOrError};
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -30,7 +30,10 @@ pub async fn raw_bytes_ingredient(
 
     match resolve_read_source(curated, &repo_path) {
         ReadSource::Gitea(parsed) => {
-            match client.fetch_raw(&parsed.server, &parsed.org, &parsed.repo, &ipath, "master").await {
+            match client
+                .fetch_raw(&parsed.server, &parsed.org, &parsed.repo, &ipath, "master")
+                .await
+            {
                 Ok((_content_type, bytes)) => {
                     let mut split_ipath = ipath.split('.');
                     let mut suffix = "unknown";
@@ -54,7 +57,10 @@ pub async fn raw_bytes_ingredient(
                     Status::BadGateway,
                     (
                         ContentType::JSON,
-                        BytesOrError::Error(make_bad_json_data_response(format!("gitea proxy: {}", e))),
+                        BytesOrError::Error(make_bad_json_data_response(format!(
+                            "gitea proxy: {}",
+                            e
+                        ))),
                     ),
                 ),
             }
@@ -66,7 +72,9 @@ pub async fn raw_bytes_ingredient(
                     Status::BadRequest,
                     (
                         ContentType::JSON,
-                        BytesOrError::Error(make_bad_json_data_response("bad repo path".to_string())),
+                        BytesOrError::Error(make_bad_json_data_response(
+                            "bad repo path".to_string(),
+                        )),
                     ),
                 );
             }

@@ -106,12 +106,9 @@ impl GiteaProxyClient {
             .json()
             .await
             .map_err(|e| GiteaProxyError::Decode(e.to_string()))?;
-        let entries: Vec<TreeEntry> = serde_json::from_value(
-            body.get("tree")
-                .cloned()
-                .unwrap_or(serde_json::json!([])),
-        )
-        .map_err(|e| GiteaProxyError::Decode(e.to_string()))?;
+        let entries: Vec<TreeEntry> =
+            serde_json::from_value(body.get("tree").cloned().unwrap_or(serde_json::json!([])))
+                .map_err(|e| GiteaProxyError::Decode(e.to_string()))?;
         Ok(entries)
     }
 

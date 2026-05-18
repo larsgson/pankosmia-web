@@ -1,4 +1,4 @@
-use crate::gitea::{GiteaProxyClient, CuratedOrgs};
+use crate::gitea::{CuratedOrgs, GiteaProxyClient};
 use crate::store::SharedProjectStore;
 use crate::utils::response::ok_json_response;
 use rocket::http::ContentType;

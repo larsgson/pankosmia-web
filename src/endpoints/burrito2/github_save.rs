@@ -35,8 +35,6 @@ use std::sync::Arc;
 /// + commit message.
 pub const MAX_INGREDIENT_BYTES: usize = 700_000;
 
-
-
 /// Endpoint contract: validate one or more ingredient-path strings
 /// before dispatching. Returns `Ok(())` if all are well-formed,
 /// otherwise a ready-to-return 400 response.

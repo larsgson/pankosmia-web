@@ -16,10 +16,7 @@ pub struct StoreBundle {
     pub sqlite: Option<Arc<SqliteUserState>>,
 }
 
-pub fn build_project_store(
-    workspace_root: PathBuf,
-    catalog: Arc<CatalogRegistry>,
-) -> StoreBundle {
+pub fn build_project_store(workspace_root: PathBuf, catalog: Arc<CatalogRegistry>) -> StoreBundle {
     let mut store = GitHubLanguageStore::new(workspace_root, catalog);
     let sqlite = open_sqlite_if_configured().map(Arc::new);
     if let Some(ref db) = sqlite {

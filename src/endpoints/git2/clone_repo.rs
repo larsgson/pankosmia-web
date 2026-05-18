@@ -27,7 +27,10 @@ pub async fn clone_repo(
     repo_path: PathBuf,
     branch: Option<String>,
 ) -> status::Custom<(ContentType, String)> {
-    if matches!(resolve_read_source(curated, &repo_path), ReadSource::Gitea(_)) {
+    if matches!(
+        resolve_read_source(curated, &repo_path),
+        ReadSource::Gitea(_)
+    ) {
         return ok_ok_json_response();
     }
     if !NET_IS_ENABLED.load(Ordering::Relaxed) {

@@ -1,4 +1,4 @@
-use crate::gitea::{resolve_read_source, GiteaProxyClient, CuratedOrgs, ReadSource};
+use crate::gitea::{resolve_read_source, CuratedOrgs, GiteaProxyClient, ReadSource};
 use crate::store::SharedProjectStore;
 use crate::structs::{AppSettings, MetadataSummary};
 use crate::utils::burrito::{summary_metadata_from_file, summary_metadata_from_str};
@@ -39,11 +39,19 @@ pub async fn summary_metadata(
     match resolve_read_source(curated, &repo_path) {
         ReadSource::Gitea(parsed) => {
             let summary = match client
-                .fetch_raw(&parsed.server, &parsed.org, &parsed.repo, "metadata.json", "master")
+                .fetch_raw(
+                    &parsed.server,
+                    &parsed.org,
+                    &parsed.repo,
+                    "metadata.json",
+                    "master",
+                )
                 .await
             {
                 Ok((_ct, bytes)) => match String::from_utf8(bytes) {
-                    Ok(json_str) => summary_metadata_from_str(&json_str).unwrap_or_else(|_| fallback_summary()),
+                    Ok(json_str) => {
+                        summary_metadata_from_str(&json_str).unwrap_or_else(|_| fallback_summary())
+                    }
                     Err(_) => fallback_summary(),
                 },
                 Err(_) => fallback_summary(),

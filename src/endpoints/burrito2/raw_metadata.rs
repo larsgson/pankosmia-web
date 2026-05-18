@@ -1,4 +1,4 @@
-use crate::gitea::{resolve_read_source, GiteaProxyClient, CuratedOrgs, ReadSource};
+use crate::gitea::{resolve_read_source, CuratedOrgs, GiteaProxyClient, ReadSource};
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -21,16 +21,23 @@ pub async fn raw_metadata(
 ) -> status::Custom<(ContentType, String)> {
     match resolve_read_source(curated, &repo_path) {
         ReadSource::Gitea(parsed) => {
-            match client.fetch_raw(&parsed.server, &parsed.org, &parsed.repo, "metadata.json", "master").await {
-                Ok((_ct, bytes)) => {
-                    match String::from_utf8(bytes) {
-                        Ok(json_str) => ok_json_response(json_str),
-                        Err(e) => not_ok_json_response(
-                            Status::BadGateway,
-                            make_bad_json_data_response(format!("not valid UTF-8: {}", e)),
-                        ),
-                    }
-                }
+            match client
+                .fetch_raw(
+                    &parsed.server,
+                    &parsed.org,
+                    &parsed.repo,
+                    "metadata.json",
+                    "master",
+                )
+                .await
+            {
+                Ok((_ct, bytes)) => match String::from_utf8(bytes) {
+                    Ok(json_str) => ok_json_response(json_str),
+                    Err(e) => not_ok_json_response(
+                        Status::BadGateway,
+                        make_bad_json_data_response(format!("not valid UTF-8: {}", e)),
+                    ),
+                },
                 Err(e) => not_ok_json_response(
                     Status::BadGateway,
                     make_bad_json_data_response(format!("gitea proxy: {}", e)),

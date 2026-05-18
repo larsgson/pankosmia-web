@@ -1,4 +1,4 @@
-use crate::gitea::{GiteaCache, GiteaProxyClient, CuratedOrgs};
+use crate::gitea::{CuratedOrgs, GiteaCache, GiteaProxyClient};
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::structs::MetadataSummary;
@@ -49,19 +49,22 @@ pub async fn summary_metadatas(
         let cache_key = server_org.clone();
         if let Some(cached) = cache.summaries.get(&cache_key) {
             for (k, v) in cached.as_ref() {
-                repos.insert(k.clone(), MetadataSummary {
-                    name: v.name.clone(),
-                    description: v.description.clone(),
-                    abbreviation: v.abbreviation.clone(),
-                    generated_date: v.generated_date.clone(),
-                    flavor_type: v.flavor_type.clone(),
-                    flavor: v.flavor.clone(),
-                    language_code: v.language_code.clone(),
-                    language_name: v.language_name.clone(),
-                    script_direction: v.script_direction.clone(),
-                    book_codes: v.book_codes.clone(),
-                    timestamp: v.timestamp,
-                });
+                repos.insert(
+                    k.clone(),
+                    MetadataSummary {
+                        name: v.name.clone(),
+                        description: v.description.clone(),
+                        abbreviation: v.abbreviation.clone(),
+                        generated_date: v.generated_date.clone(),
+                        flavor_type: v.flavor_type.clone(),
+                        flavor: v.flavor.clone(),
+                        language_code: v.language_code.clone(),
+                        language_name: v.language_name.clone(),
+                        script_direction: v.script_direction.clone(),
+                        book_codes: v.book_codes.clone(),
+                        timestamp: v.timestamp,
+                    },
+                );
             }
             continue;
         }
@@ -86,7 +89,9 @@ pub async fn summary_metadatas(
                 .await
             {
                 Ok((_ct, bytes)) => match String::from_utf8(bytes) {
-                    Ok(json_str) => summary_metadata_from_str(&json_str).unwrap_or_else(|_| fallback_summary()),
+                    Ok(json_str) => {
+                        summary_metadata_from_str(&json_str).unwrap_or_else(|_| fallback_summary())
+                    }
                     Err(_) => fallback_summary(),
                 },
                 Err(_) => continue,
@@ -94,7 +99,9 @@ pub async fn summary_metadatas(
             org_summaries.insert(repo_key, summary);
         }
 
-        cache.summaries.insert(cache_key, Arc::new(org_summaries.clone()));
+        cache
+            .summaries
+            .insert(cache_key, Arc::new(org_summaries.clone()));
         repos.extend(org_summaries);
     }
 
