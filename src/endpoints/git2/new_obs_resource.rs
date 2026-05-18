@@ -41,9 +41,17 @@ pub async fn new_obs_resource_repo(
     cookies: &CookieJar<'_>,
     json_form: Json<NewObsContentForm>,
 ) -> status::Custom<(ContentType, String)> {
+    println!(
+        "new-obs-resource: called with abbr={:?} lang={:?} name={:?}",
+        json_form.content_abbr, json_form.content_language_code, json_form.content_name
+    );
     let github_user_id = match read_session(cookies) {
-        Some(id) => id,
+        Some(id) => {
+            println!("new-obs-resource: session user_id={}", id);
+            id
+        }
         None => {
+            println!("new-obs-resource: FAIL no session");
             return not_ok_json_response(
                 Status::Unauthorized,
                 make_bad_json_data_response("not signed in".into()),
@@ -51,14 +59,19 @@ pub async fn new_obs_resource_repo(
         }
     };
     if let Err(RateLimitError::Exceeded(retry_after)) = rate_limiter.check(github_user_id) {
+        println!("new-obs-resource: FAIL rate limited");
         return not_ok_json_response(
             Status::TooManyRequests,
             make_bad_json_data_response(format!("rate limit exceeded; retry in {}s", retry_after)),
         );
     }
     let app_auth = match app_auth.inner().as_ref() {
-        Some(a) => a,
+        Some(a) => {
+            println!("new-obs-resource: app auth present");
+            a
+        }
         None => {
+            println!("new-obs-resource: FAIL no app auth");
             return not_ok_json_response(
                 Status::ServiceUnavailable,
                 make_bad_json_data_response(
@@ -68,14 +81,19 @@ pub async fn new_obs_resource_repo(
         }
     };
     let token = match tokens.load(github_user_id) {
-        Ok(Some(t)) => t,
+        Ok(Some(t)) => {
+            println!("new-obs-resource: token loaded");
+            t
+        }
         Ok(None) => {
+            println!("new-obs-resource: FAIL no token stored");
             return not_ok_json_response(
                 Status::Unauthorized,
                 make_bad_json_data_response("no stored token; please sign in again".into()),
             );
         }
         Err(e) => {
+            println!("new-obs-resource: FAIL token store error: {}", e);
             return not_ok_json_response(
                 Status::InternalServerError,
                 make_bad_json_data_response(format!("token store: {}", e)),
@@ -83,8 +101,12 @@ pub async fn new_obs_resource_repo(
         }
     };
     let user = match github_client.get_user(&token).await {
-        Ok(u) => u,
+        Ok(u) => {
+            println!("new-obs-resource: github user={}", u.login);
+            u
+        }
         Err(e) => {
+            println!("new-obs-resource: FAIL github /user: {}", e);
             return not_ok_json_response(
                 Status::BadGateway,
                 make_bad_json_data_response(format!("github /user: {}", e)),
@@ -93,11 +115,16 @@ pub async fn new_obs_resource_repo(
     };
 
     let lang = if let Some(LanguageHeader(l)) = &language_header {
+        println!("new-obs-resource: lang from header: {}", l);
         l.clone()
     } else {
         match LanguageCode::parse(&json_form.content_language_code) {
-            Ok(l) => l,
+            Ok(l) => {
+                println!("new-obs-resource: lang from form: {}", l);
+                l
+            }
             Err(e) => {
+                println!("new-obs-resource: FAIL invalid language code: {}", e);
                 return not_ok_json_response(
                     Status::BadRequest,
                     make_bad_json_data_response(format!("invalid language code: {}", e)),
@@ -105,7 +132,7 @@ pub async fn new_obs_resource_repo(
             }
         }
     };
-    let _ = sqlite; // available for future use
+    let _ = sqlite;
 
     let template_dir = format!(
         "{}templates{}content_templates{}text_stories",
@@ -114,7 +141,12 @@ pub async fn new_obs_resource_repo(
         os_slash_str(),
     );
     let metadata_template_path = format!("{}{}metadata.json", &template_dir, os_slash_str());
+    println!("new-obs-resource: template_dir={}", template_dir);
     if !std::path::Path::new(&metadata_template_path).is_file() {
+        println!(
+            "new-obs-resource: FAIL metadata template not found: {}",
+            metadata_template_path
+        );
         return not_ok_json_response(
             Status::BadRequest,
             make_bad_json_data_response(format!(
@@ -155,8 +187,13 @@ pub async fn new_obs_resource_repo(
         path: "metadata.json".to_string(),
         bytes: metadata_string.into_bytes(),
     });
+    println!("new-obs-resource: metadata.json prepared");
 
     let ingredients_dir = format!("{}{}ingredients", &template_dir, os_slash_str());
+    println!(
+        "new-obs-resource: scanning ingredients at {}",
+        ingredients_dir
+    );
     for entry in WalkDir::new(&ingredients_dir)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -187,6 +224,12 @@ pub async fn new_obs_resource_repo(
         });
     }
 
+    println!(
+        "new-obs-resource: collected {} files, dispatching bulk upload for lang={}",
+        files.len(),
+        lang
+    );
+
     let op = BulkOp::UploadFiles {
         prefix: String::new(),
         files,
@@ -206,6 +249,10 @@ pub async fn new_obs_resource_repo(
     .await
     {
         Ok(outcome) => {
+            println!(
+                "new-obs-resource: SUCCESS pr_url={} branch={}",
+                outcome.pr_url, outcome.branch
+            );
             let body = json!({
                 "is_good": true,
                 "status": outcome.status,
@@ -215,9 +262,12 @@ pub async fn new_obs_resource_repo(
             });
             ok_json_response(body.to_string())
         }
-        Err(e) => not_ok_json_response(
-            Status::BadGateway,
-            make_bad_json_data_response(format!("github: {}", e)),
-        ),
+        Err(e) => {
+            println!("new-obs-resource: FAIL bulk op: {}", e);
+            not_ok_json_response(
+                Status::BadGateway,
+                make_bad_json_data_response(format!("github: {}", e)),
+            )
+        }
     }
 }
