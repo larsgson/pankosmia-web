@@ -31,6 +31,7 @@ RUN apt-get update \
        zlib1g-dev \
        ca-certificates \
        perl \
+       perl-modules \
     && rm -rf /var/lib/apt/lists/*
 
 # Cook dependencies (cached until Cargo.toml/Cargo.lock change).
