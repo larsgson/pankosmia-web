@@ -24,9 +24,9 @@ None depend on the others.
 
 ## 1. Why these matter
 
-Four bulk-mutation endpoints exist in FS-mode `pankosmia-web` and are
-called by existing Pankosmia content handlers. In GitHub mode
-`pankosmia_docker` returns 501 (per
+Four bulk-mutation endpoints exist in the ancestor `pankosmia-web`
+and are called by existing Pankosmia content handlers.
+`pankosmia_docker` currently returns 501 for them (per
 `temp/CLIENT_INTEGRATION.md §14`).
 
 | Endpoint | Used by | Consequence of 501 |
@@ -162,7 +162,7 @@ existing client error/success handling works:
 **Purpose**: recursively delete every ingredient whose path starts
 with the given prefix. Atomic single-commit removal.
 
-**FS-mode reference**: `pankosmia-web/src/endpoints/burrito2/post_delete_ingredients.rs`
+**pankosmia-web reference**: `pankosmia-web/src/endpoints/burrito2/post_delete_ingredients.rs`
 
 **Consumers**: `core-contenthandler_text_translation`
 (`DeleteTextTranslationBook.jsx:81`) calls this after a per-file
@@ -212,7 +212,7 @@ delete sequence to clean up empty directories.
 files. Used as cleanup after a bulk delete, or when ingredients are
 added/removed via the GitHub web UI directly.
 
-**FS-mode reference**: `pankosmia-web/src/endpoints/burrito2/post_remake_ingredients_metadata.rs`
+**pankosmia-web reference**: `pankosmia-web/src/endpoints/burrito2/post_remake_ingredients_metadata.rs`
 
 **Consumers**: `core-contenthandler_text_translation`
 (`DeleteTextTranslationBook.jsx:81`).
@@ -228,8 +228,8 @@ added/removed via the GitHub web UI directly.
 2. Filter to entries under `ingredients/`.
 3. For each, compute the burrito-spec ingredient entry (checksum,
    mimeType, size, role, etc. — see Scripture Burrito spec). The
-   server should reuse whatever logic FS-mode already has; the
-   computations are the same.
+   server should reuse whatever logic the ancestor `pankosmia-web`
+   already has; the computations are the same.
 4. Read the current `metadata.json` (find it in the tree, fetch the
    blob via `GET /repos/.../git/blobs/<sha>`, base64-decode).
 5. Parse, replace the `ingredients` object, re-serialize as
@@ -267,7 +267,7 @@ good starting point for the Git Data API integration.
 for USFM import (user uploads a zip of book files), OBS image
 imports (less common), and similar bulk-ingest flows.
 
-**FS-mode reference**: `pankosmia-web/src/endpoints/burrito2/post_zipped_ingredient.rs`
+**pankosmia-web reference**: `pankosmia-web/src/endpoints/burrito2/post_zipped_ingredient.rs`
 
 **Consumers**: `core-contenthandler_text_translation`
 (`UsfmImport.jsx` etc.).
@@ -319,7 +319,7 @@ imports (less common), and similar bulk-ingest flows.
 the contents of a client-uploaded zip. Used for restore-from-backup
 and similar full-import flows.
 
-**FS-mode reference**: `pankosmia-web/src/endpoints/burrito2/post_zipped_repo.rs`
+**pankosmia-web reference**: `pankosmia-web/src/endpoints/burrito2/post_zipped_repo.rs`
 
 **Consumers**: rare. Backup/restore tooling; future "burrito
 exchange" workflows. **Lowest priority of the four.**
@@ -375,12 +375,11 @@ exchange" workflows. **Lowest priority of the four.**
 
 ### 3.5 Zip security (applies to §3.3 and §3.4)
 
-The existing FS-mode endpoints have known weaknesses flagged in our
-earlier security scan (`temp/SECURITY.md` if it documents this — at
-minimum these are observed in the FS code):
+The existing `pankosmia-web` endpoints have known weaknesses flagged
+in our earlier security scan:
 
-- `..` in zip paths → path traversal (mitigated in FS code by
-  `enclosed_name()`; preserve this).
+- `..` in zip paths → path traversal (mitigated in `pankosmia-web`
+  by `enclosed_name()`; preserve this).
 - Symlink entries inside zip → not handled; reject anything that
   isn't a regular file or directory.
 - Zip bombs → very high compression ratio entries. Enforce the
@@ -388,8 +387,8 @@ minimum these are observed in the FS code):
   trusting decompression output.
 - Empty zip → reject as 400 (probably user error).
 
-The GitHub Git Data API path is inherently safer than FS-mode
-unzip-to-disk: there's no on-disk write to escape. The remaining
+The GitHub Git Data API path is inherently safer than the old
+unzip-to-disk approach: there's no on-disk write to escape. The remaining
 risks are memory pressure and GitHub-side quota burn, both bounded
 by the limits in §2.3.
 
@@ -490,7 +489,7 @@ is fine in practice; can encode 100-file deletions comfortably).
 
 ## 6. What clients (and wrappers) expect
 
-Existing client integration patterns (see `CLIENT_WRAPPER_GUIDE.md`)
+Existing client integration patterns (see `../dev/CLIENT_WRAPPER_GUIDE.md`)
 expect these endpoints to:
 
 - Return the same `{is_good, status, branch, pr_url, pr_number, ...}`
@@ -524,7 +523,7 @@ biggest historical use case that pushed against them.
   single-file saves and don't need bulk ops.
 - `USER_STATE_SPEC.md` — replaces stub state endpoints; orthogonal
   to bulk ops.
-- `CLIENT_WRAPPER_GUIDE.md` — what clients expect; this doc's
+- `../dev/CLIENT_WRAPPER_GUIDE.md` — what clients expect; this doc's
   response envelope matches.
 - `ARCHITECTURE_DECISIONS.md` — records why we chose to implement
   these here rather than in a middleware layer or via client-side
@@ -532,9 +531,9 @@ biggest historical use case that pushed against them.
 
 ### `pankosmia_docker`'s existing docs
 
-- `CLIENT_INTEGRATION.md §14` — lists these as 501 (to be removed
+- `../CLIENT_INTEGRATION.md §14` — lists these as 501 (to be removed
   from the "not implemented" list once §3.1–3.4 here ship).
-- `HOSTING.md` — operator setup of `pankosmia_docker` (where
+- `../HOSTING.md` — operator setup of `pankosmia_docker` (where
   GitHub App + working branch logic lives).
 
 ### External
@@ -547,12 +546,11 @@ biggest historical use case that pushed against them.
 - Scripture Burrito spec (for §3.2's ingredient-entry shape):
   https://docs.burrito.bible/
 
-### FS-mode references
+### pankosmia-web references
 
-The four endpoints exist in FS-mode `pankosmia-web` (predecessor of
-`pankosmia_docker`'s GitHub mode). The FS implementations are the
-behavioural contract to match; only the I/O layer changes (`std::fs`
-→ GitHub Git Data API).
+The four endpoints originated in the ancestor project `pankosmia-web`.
+Those implementations define the behavioural contract to match; only
+the I/O layer changes (`std::fs` -> GitHub Git Data API).
 
 If a `pankosmia-web` checkout is available:
 

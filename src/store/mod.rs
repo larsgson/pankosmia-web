@@ -1,16 +1,14 @@
 //! Storage abstraction.
 //!
 //! Endpoints call into these traits instead of `std::fs::*` directly.
-//! Two implementations:
-//!   * `FsLanguageStore` for single-tenant FS deployments (desktop / dev).
-//!   * `GitHubLanguageStore` for hosted, GitHub-backed deployments.
-//!
-//! Runtime selection via `STORAGE_BACKEND=fs|github` (default `fs`).
+//! `GitHubLanguageStore` is the single implementation: multi-tenant,
+//! GitHub-backed. User identity via the GitHub App's user-authorization
+//! flow; writes via the App's installation token.
 
 pub mod blob_store;
-pub mod fs;
 pub mod git_workspace;
 pub mod github;
+pub mod paths;
 pub mod project_store;
 pub mod selector;
 pub mod sqlite_user_state;

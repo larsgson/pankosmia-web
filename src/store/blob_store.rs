@@ -1,13 +1,9 @@
 //! `BlobStore` — abstraction over object-storage uploads/downloads.
 //!
-//! Backwards-compat note: in single-tenant FS deployments the impl is
-//! a thin wrapper that reads/writes files on disk. In hosted Phase 2
-//! deployments the impl issues presigned URLs to Supabase Storage /
-//! S3-compatible storage and never touches the bytes.
+//! The impl issues presigned URLs to Supabase Storage / S3-compatible
+//! storage and never touches the bytes.
 //!
-//! This module ships the trait only; implementations land in M9.
-//! Defining the trait now keeps the audio-related endpoints' future
-//! signatures clear from the start.
+//! This module ships the trait only; implementations land later.
 //!
 //! See `docs/SCALING.md` §2 for why audio bytes do not transit the
 //! Rust server in production.

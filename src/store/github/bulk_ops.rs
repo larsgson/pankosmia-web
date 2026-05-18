@@ -128,8 +128,8 @@ pub enum BulkOp {
     /// per-blob `checksum` field uses the **git blob sha1** (taken
     /// directly from the tree response, not md5). This avoids the
     /// per-blob downloads that an md5 strategy would require; the
-    /// trade-off is a documented behaviour delta vs FS mode (which
-    /// uses md5).
+    /// trade-off is that the checksum differs from an md5-based
+    /// approach.
     RegenerateMetadata { app_resources_dir: String },
 }
 
@@ -491,7 +491,7 @@ fn build_ingredients_from_tree(
         if e.entry_type != "blob" {
             continue;
         }
-        // Mirror FS-mode exclusions: skip hidden, skip metadata.json itself, skip .bak.
+        // Skip hidden files, metadata.json itself, and .bak files.
         if e.path.starts_with('.') || e.path.contains("/.") {
             continue;
         }

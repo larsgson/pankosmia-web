@@ -4,8 +4,8 @@ Capacity planning and the architecture choices that make a single
 Rust binary serve thousands of users across hundreds of language
 repos.
 
-For the architecture overview, see `docs/ARCHITECTURE.md`. For
-operator-side configuration, see `docs/HOSTING.md`.
+For the architecture overview, see `ARCHITECTURE.md`. For
+operator-side configuration, see `../HOSTING.md`.
 
 ---
 
@@ -251,7 +251,7 @@ In rough priority order:
 - [ ] **Membership cache** (30 s TTL).
 - [ ] **`ulimit -n` ≥ 65535** in systemd / Docker config.
 - [ ] **Reverse-proxy SSE config** (no buffering, generous
-      read-timeout). See `docs/HOSTING.md` §5.
+      read-timeout). See `../HOSTING.md` §5.
 - [ ] **Structured logging** (`tracing`) with per-request span
       IDs and per-language activity tags.
 - [ ] **Graceful shutdown** that drains SSE + closes git locks
@@ -317,23 +317,20 @@ incident.
 
 The architecture in this document makes the simpler cases trivial:
 
-- **Desktop binary**: same crate, FS backend, single user, no
-  auth. Scaling layers are no-ops or have FS-equivalent
-  implementations.
-- **Internal team server (10–50 users)**: same crate, FS or
-  GitHub backend, basic auth fairing if desired. Scaling layers
+- **Internal team server (10–50 users)**: same crate, GitHub
+  backend, basic auth fairing if desired. Scaling layers are
   mostly no-ops at this size; the architecture doesn't get in the
   way.
 - **Public hosted service (5,000+ users)**: same crate, GitHub
   backend, all scaling layers active. The architecture earns its
   keep.
 
-One codebase, three deployments, no architectural divergence.
+One codebase, one backend, no architectural divergence.
 
 ---
 
 See also:
 
-- `docs/ARCHITECTURE.md` — design rationale.
-- `docs/HOSTING.md` — operator-facing integration contract.
-- `docs/SECURITY.md` — security posture.
+- `ARCHITECTURE.md` — design rationale.
+- `../HOSTING.md` — operator-facing integration contract.
+- `SECURITY.md` — security posture.

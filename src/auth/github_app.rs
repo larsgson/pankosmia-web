@@ -123,8 +123,7 @@ impl GithubAppAuth {
     /// `GITHUB_APP_ID` env var is required either way.
     ///
     /// Returns `Ok(None)` when no App credentials are configured at
-    /// all — lets the server boot in FS mode or in the legacy
-    /// OAuth-App mode without crashing.
+    /// all.
     pub fn from_env() -> Result<Option<Self>, GithubAppError> {
         let app_id = match std::env::var("GITHUB_APP_ID") {
             Ok(s) if !s.is_empty() => s

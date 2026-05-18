@@ -1,4 +1,4 @@
-use crate::identity::{LanguageCode, LOCAL_USER};
+use crate::identity::{LanguageCode, COMPAT_USER};
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::client::Clients;
@@ -56,7 +56,7 @@ pub async fn post_languages(
     }
 
     // Trait write — authoritative source going forward.
-    if let Err(e) = store.put_languages(LOCAL_USER, typed_langs.clone()).await {
+    if let Err(e) = store.put_languages(COMPAT_USER, typed_langs.clone()).await {
         return not_ok_json_response(
             Status::InternalServerError,
             make_bad_json_data_response(format!("Could not persist languages: {}", e)),

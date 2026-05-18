@@ -1,71 +1,114 @@
 # pankosmia-docker
 
-Hosted Pankosmia server: GitHub-backed multi-language
-Bible-translation collaboration. Rust / Rocket / git2.
+The online hosted version of the
+[Pankosmia](https://pankosmia.dev/) platform
+([GitHub](https://github.com/pankosmia)).
 
-A single binary serves thousands of translators across hundreds of
-language repos. Each language is a public GitHub repository;
-translators sign in with their GitHub account and edit text through
-their browser. The server forks, branches, pushes, and opens pull
-requests on the user's behalf so translators never visit GitHub
-directly. Audio assets stay outside git in object storage.
+A hosted [Scripture Burrito](https://docs.burrito.bible/) read/write
+service where every edit lands as a GitHub Pull Request against the
+language's source-of-truth repo. Sign-in, admin review, change
+notifications, and rate-limiting make this safe for multi-user
+collaboration.
 
-## Quick start (development)
+Built on [Rocket](https://rocket.rs/) (Rust) and
+[git2](https://crates.io/crates/git2).
+
+## The Pankosmia platform
+
+This project is part of the [Pankosmia](https://pankosmia.dev/)
+ecosystem — a set of tools for collaborative Bible translation
+built around the [Scripture Burrito](https://docs.burrito.bible/)
+standard. The offline Pankosmia desktop app
+([pankosmia-web](https://github.com/pankosmia/pankosmia-web))
+runs a local server on the user's machine with a filesystem
+backend. **pankosmia-docker** takes the same API surface online:
+it replaces the filesystem with GitHub as the single source of
+truth, adds multi-user authentication, and deploys as a Docker
+container.
+
+The same React/JS client apps (munchers) that run inside the
+desktop Pankosmia shell can drive this hosted service with
+minimal changes. Content is stored in Scripture Burrito format in
+both cases.
+
+For more about the Pankosmia project:
+- Website: **https://pankosmia.dev/**
+- GitHub org: **https://github.com/pankosmia**
+
+## What it does
+
+Translators open a web app in their browser, pick a language, and
+edit Scripture or OBS content. Under the hood the server:
+
+1. **Authenticates** the user via GitHub OAuth.
+2. **Reads** content from the language's GitHub repo.
+3. **Writes** edits to a per-user branch using the GitHub App
+   installation token.
+4. **Opens a Pull Request** automatically so a reviewer can approve
+   and merge the change into the canonical branch.
+
+No one needs to know git. The server handles branching, committing,
+and PR lifecycle transparently.
+
+
+## Architecture at a glance
+
+```
+Browser (Netlify)          Server (Railway)           GitHub
+┌──────────────┐    HTTPS   ┌──────────────┐    API   ┌──────────────┐
+│  Dashboard   │───────────>│  pankosmia-  │────────>│ pankosmia-   │
+│  + Munchers  │<───────────│  docker      │<────────│ langs/yua    │
+│  (static JS) │    JSON    │  (Rust)      │   PRs   │ langs/fr     │
+└──────────────┘            └──────────────┘         │ langs/...    │
+                                   │                 └──────────────┘
+                                   │
+                              ┌────┴────┐
+                              │ SQLite  │  per-user state
+                              │ /data/  │  (languages, settings)
+                              └─────────┘
+```
+
+**Key components:**
+- **Catalog** — the server discovers available languages from the
+  `pankosmia-langs` GitHub org (repos tagged `pankosmia-language`).
+- **User language management** — each user claims languages to work
+  on; the server tracks the active language and routes reads/writes
+  to the correct repo.
+- **Edit flow** — writes go through the GitHub Contents API to a
+  per-user branch, with automatic PR creation.
+- **Admin review** — reviewers approve or reject PRs via dedicated
+  endpoints.
+
+## Quick start
 
 ```bash
-# Build
-cargo build
-
-# Run with the default filesystem backend (no auth, single user):
-cargo run -- /path/to/workspace
-
-# Run with the GitHub backend (multi-user, hosted):
-STORAGE_BACKEND=github \
-  GITHUB_CLIENT_ID=...                                       \
-  GITHUB_CLIENT_SECRET=...                                   \
-  GITHUB_WEBHOOK_SECRET=...                                  \
-  PANKOSMIA_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)  \
-  PANKOSMIA_PUBLIC_ORIGIN=https://example.com                \
-  PANKOSMIA_CATALOG_PATH=/path/to/catalog/languages.yaml     \
+GITHUB_APP_ID=... \
+  GITHUB_CLIENT_ID=... \
+  GITHUB_CLIENT_SECRET=... \
+  PANKOSMIA_CATALOG_ORG=pankosmia-langs \
   cargo run -- /path/to/workspace
 ```
 
-The default port is `19119`; configure via the standard
-`ROCKET_PORT` env or `Rocket.toml`.
+Default port: `19119` (override via `ROCKET_PORT`).
+
+See [`docs/HOSTING.md`](docs/HOSTING.md) for the full environment
+variable reference and deployment guide.
 
 ## Documentation
 
-| Role | Read |
+See [`docs/INDEX.md`](docs/INDEX.md) for the full reading guide.
+
+| I want to... | Read |
 |---|---|
-| Newcomer / architecture overview | `docs/ARCHITECTURE.md` |
-| Operator running the server | `docs/HOSTING.md`, `docs/SCALING.md` |
-| Building a JS/web client | `docs/CLIENT_INTEGRATION.md` |
-| Setting up the language catalog | `docs/CATALOG_REPO_TEMPLATE.md` |
-| Reviewing the data model | `docs/DATA_MODEL.md` |
-| Reviewing security posture | `docs/SECURITY.md` |
-
-## Tested on
-
-- Linux x86_64 (Debian / Ubuntu): primary target.
-- macOS (recent Apple silicon and Intel): supported for development.
-- Windows: best-effort; not the primary deployment target.
-
-Toolchain: stable Rust (1.86+), OpenSSL 3.x system library, Git.
-For development clients, Node 18+ and npm 10+.
-
-## Attribution
-
-Forked from
-[`pankosmia/pankosmia-web`](https://github.com/pankosmia/pankosmia-web),
-MIT-licensed. The fork relationship has been severed on GitHub;
-this project is no longer affiliated with the Pankosmia
-organization. Endpoint URLs and on-disk content layout retain
-backwards compatibility with `pankosmia/pankosmia-web` v0.14.x
-clients where practical, so the same JS/React clients can drive
-either server with minimal changes.
-
-See `LICENSE` for full attribution.
+| Understand the system | [`docs/dev/ARCHITECTURE.md`](docs/dev/ARCHITECTURE.md) |
+| Run / deploy the server | [`docs/HOSTING.md`](docs/HOSTING.md) |
+| Build a client app | [`docs/CLIENT_INTEGRATION.md`](docs/CLIENT_INTEGRATION.md) |
+| Integrate user language switching | [`docs/USER_LANGUAGES.md`](docs/USER_LANGUAGES.md) |
+| See all API routes | [`docs/API_ROUTES.md`](docs/API_ROUTES.md) |
 
 ## License
 
 MIT — see `LICENSE`.
+
+Forked from
+[`pankosmia/pankosmia-web`](https://github.com/pankosmia/pankosmia-web).

@@ -341,12 +341,9 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
         .manage(catalog_sync.clone())
         .manage(catalog_org.clone());
 
-    // Phase 2 storage abstraction. Endpoints call this trait object
-    // instead of `std::fs::*` directly. The runtime selector picks
-    // the implementation from `STORAGE_BACKEND=fs|github`.
     let store_bundle = crate::store::selector::build_project_store(
         std::path::PathBuf::from(repo_dir_path.clone()),
-        Some(catalog.clone()),
+        catalog.clone(),
     );
     let project_store = store_bundle.store;
     let sqlite_user_state: Option<
@@ -354,7 +351,7 @@ pub fn rocket(launch_config: Value) -> Rocket<Build> {
     > = store_bundle.sqlite;
     // Periodic-fetch fallback for missed language webhooks. Spawned
     // before `manage` consumes the store so we can hold our own
-    // Arc clone. No-op cadence in FS mode (empty catalog).
+    // Arc clone.
     if let Some(interval) = crate::server::periodic_fetch::interval_from_env() {
         let org_params = catalog_org.as_deref().and_then(|org| {
             let id = std::env::var("PANKOSMIA_DEFAULT_INSTALLATION_ID")

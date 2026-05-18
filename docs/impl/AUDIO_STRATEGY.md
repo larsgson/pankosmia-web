@@ -424,7 +424,7 @@ Each PWA repo handles this independently. A shared library
 
 ## 11. Migration from any prior "audio in burrito" data
 
-If existing burritos contain audio bytes (e.g., from FS-mode
+If existing burritos contain audio bytes (e.g., from pankosmia-web
 deployments where `audio_content/NN-PP_T.wav` was a real WAV file),
 migrate by:
 
@@ -528,6 +528,6 @@ or a periodic mirror job.
   effort; audio is unrelated).
 - `USER_STATE_SPEC.md` — replaces stub endpoints with real per-user
   state (parallel effort).
-- `CLIENT_WRAPPER_GUIDE.md` — how PWA wrappers integrate (consumes
+- `../dev/CLIENT_WRAPPER_GUIDE.md` — how PWA wrappers integrate (consumes
   this audio spec).
 - `ARCHITECTURE_DECISIONS.md` — records why audio is external.

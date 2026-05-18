@@ -4,8 +4,8 @@ What entities exist in `pankosmia_docker`, where they live, what
 their lifecycle is. Source of truth for migrations and schema
 discussions.
 
-For the architecture rationale, see `docs/ARCHITECTURE.md`. For
-threat model, see `docs/SECURITY.md`.
+For the architecture rationale, see `ARCHITECTURE.md`. For
+threat model, see `SECURITY.md`.
 
 ---
 
@@ -22,7 +22,7 @@ threat model, see `docs/SECURITY.md`.
 
 UUIDs are validated by `FromParam` at routing time. Free-text
 identifiers (`LanguageCode`, `IngredientPath`) go through dedicated
-validators (see `docs/SECURITY.md` §4).
+validators (see `SECURITY.md` §4).
 
 `UserId` is deterministically derived from the GitHub user-id so
 that the same user maps to the same `UserId` across server
@@ -159,25 +159,19 @@ The raw audio bytes for a recording.
 Per-strategy decision: per-user UI state (typography, font
 features, BCV cursor) lives in **client localStorage**, not on the
 server. The server is stateless for these. Endpoints that returned
-typography / BCV in older single-tenant clients return defaults
-on the GitHub backend; clients should treat them as defaults and
-override with localStorage.
+typography / BCV in the ancestor `pankosmia-web` project return
+defaults here; clients should treat them as defaults and override
+with localStorage.
 
 ### 2.9 AppState (per-language)
 
-Same story as UserSettings: client localStorage on hosted; server
-returns defaults. The single-tenant FS backend continues to honor
-the older server-side per-language `app_state.json` for
-compatibility with desktop clients.
+Same story as UserSettings: client localStorage; server returns
+defaults.
 
-### 2.10 GitAuthToken (Gitea OAuth, desktop-only)
+### 2.10 GitAuthToken (Gitea OAuth, historical)
 
-Used by the desktop / FS backend for Gitea integration. Not used
-on hosted (GitHub OAuth replaces it).
-
-- **Authoritative on FS**: per-user JSON at
-  `<workspace>/.pankosmia/users/<user-id>/gitea_tokens.json`.
-- **Authoritative on GitHub**: not used.
+Legacy Gitea integration from the ancestor `pankosmia-web`.
+Not used in this project (GitHub OAuth replaces it).
 
 ### 2.11 OAuthToken (GitHub OAuth, hosted-only)
 
@@ -229,10 +223,7 @@ Hosted (GitHub backend):
 └── (no other tenant subtrees; everything Pankosmia-managed is under .pankosmia/)
 ```
 
-The `.pankosmia/` prefix isolates Pankosmia-managed data. Legacy
-desktop / FS deployments read from a flatter layout where
-ingredient-bearing repos live directly under `<workspace_root>/`;
-the FS backend honors that for backwards compatibility.
+The `.pankosmia/` prefix isolates Pankosmia-managed data.
 
 Object storage layout (hosted, audio):
 
@@ -327,9 +318,9 @@ insufficient.
 
 ---
 
-## 8. Migration shape from a desktop / FS deployment
+## 8. Migration from a pankosmia-web deployment
 
-Operators of an existing single-tenant deployment moving to
+Operators of an existing `pankosmia-web` deployment moving to
 hosted:
 
 1. Push each existing language working tree to a fresh public
@@ -350,7 +341,7 @@ binary).
 
 ## See also
 
-- `docs/ARCHITECTURE.md` — the design that uses this data model.
-- `docs/SECURITY.md` — what each integrity rule defends against.
-- `docs/SCALING.md` — capacity-planning consequences.
-- `docs/CATALOG_REPO_TEMPLATE.md` — the catalog-side schema.
+- `ARCHITECTURE.md` — the design that uses this data model.
+- `SECURITY.md` — what each integrity rule defends against.
+- `SCALING.md` — capacity-planning consequences.
+- `CATALOG_REPO_TEMPLATE.md` — the catalog-side schema.

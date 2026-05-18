@@ -82,20 +82,7 @@ async fn get_typography(&self, user: UserId, lang: LanguageCode) -> StoreResult<
 async fn put_typography(&self, user: UserId, lang: LanguageCode, t: Typography) -> StoreResult<()>;
 ```
 
-### 3.2 Update FsLanguageStore
-
-In `src/store/fs/store.rs`. Two options:
-
-- **Ignore the new parameter** — single-tenant FS mode has one user,
-  one global typography. Keep reading/writing the same file path.
-  Simplest, fully backwards compatible.
-- **Store per-language** — write to
-  `.pankosmia/languages/<lang>/typography/<user>.json`. Only worth
-  doing if FS-mode users want per-language typography.
-
-Recommendation: ignore the parameter in FS mode.
-
-### 3.3 Update GitHubLanguageStore
+### 3.2 Update GitHubLanguageStore
 
 In `src/store/github/store.rs`, replace:
 
@@ -106,13 +93,12 @@ let global_lang = LanguageCode::parse("x-global").unwrap();
 with the `lang` parameter passed by the trait. Remove the
 `x-global` workaround entirely.
 
-### 3.4 Update the endpoint handlers
+### 3.3 Update the endpoint handlers
 
 **GET typography** — `src/endpoints/settings2/get_typography.rs`:
 
 The handler needs to read `X-Language-Code` from the request and
-pass it to `store.get_typography(user, lang)`. In FS mode (no
-header), fall back to a default language code.
+pass it to `store.get_typography(user, lang)`.
 
 **POST typography** — `src/endpoints/settings2/post_typography.rs`:
 
@@ -126,7 +112,7 @@ This endpoint mutates a single feature within the typography
 struct. It needs to: read current typography for the language,
 update the feature, write it back.
 
-### 3.5 Migration of existing `x-global` data
+### 3.4 Migration of existing `x-global` data
 
 When the trait change lands, optionally migrate stored `x-global`
 rows to the user's first selected language. Or leave them — the
@@ -160,7 +146,6 @@ would read `X-Language-Code` and persist per-(user, language).
 |---|---|
 | `src/store/project_store.rs` | Trait definition — add `lang` param |
 | `src/store/types.rs` | Type definitions (no change needed) |
-| `src/store/fs/store.rs` | FS impl — ignore new param |
 | `src/store/github/store.rs` | GitHub impl — pass `lang` to SQLite, remove `x-global` |
 | `src/store/sqlite_user_state.rs` | SQLite layer — already supports per-language, no change |
 | `src/endpoints/settings2/get_typography.rs` | Read `X-Language-Code`, pass to store |

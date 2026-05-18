@@ -1,29 +1,7 @@
-//! Path resolution + traversal validation for the FS backend.
+//! Path resolution + traversal validation.
 //!
-//! Layout under `<workspace_root>/`:
-//!
-//! ```text
-//! <workspace_root>/
-//! ├── .pankosmia/                ← reserved Pankosmia internal storage
-//! │   │                            (leading `.` makes legacy
-//! │   │                            `list_local_repos` skip it)
-//! │   ├── users/<user_id>/
-//! │   │   ├── settings.json      # UserSettings
-//! │   │   ├── auth_tokens.json   # gitea OAuth tokens (per-user)
-//! │   │   └── auth_requests.json # short-lived OAuth state
-//! │   └── languages/<lang>/
-//! │       ├── members.json       # LanguageMembership rows
-//! │       ├── app_state.json     # AppState (per-language)
-//! │       ├── bcv/<user_id>.json # Bcv (per-user-per-language)
-//! │       └── repos.json         # RepoRecord registry
-//! └── <source>/<org>/<name>/     ← legacy repo working trees,
-//!     └── (.git, ingredients,      unchanged through M3
-//!          metadata.json, ...)
-//! ```
-//!
-//! The `.pankosmia/` prefix isolates Pankosmia-managed metadata from
-//! user-owned repo directories. Legitimate "source" names like
-//! `_local_` (single-underscore) are not affected.
+//! Shared path helpers used by the GitHub store and legacy endpoint
+//! compatibility code.
 
 use crate::identity::{LanguageCode, RepoId, UserId};
 use crate::store::types::{StoreError, StoreResult};

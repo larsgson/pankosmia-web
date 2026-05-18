@@ -1,4 +1,4 @@
-use crate::identity::LOCAL_USER;
+use crate::identity::COMPAT_USER;
 use crate::store::SharedProjectStore;
 use crate::structs::{AppSettings, ContentOrRedirect};
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -31,7 +31,7 @@ pub async fn get_new_auth_token(
     }
 
     // One-shot take of the in-flight auth request from the trait.
-    let pending = match store.take_auth_request(LOCAL_USER, &token_key).await {
+    let pending = match store.take_auth_request(COMPAT_USER, &token_key).await {
         Ok(Some(r)) => r,
         Ok(None) => {
             return ContentOrRedirect::Content(not_ok_json_response(
@@ -63,10 +63,10 @@ pub async fn get_new_auth_token(
 
     if code.is_empty() {
         cj.remove(format!("{}_code", token_key));
-        let _ = store.delete_auth_token(LOCAL_USER, &token_key).await;
+        let _ = store.delete_auth_token(COMPAT_USER, &token_key).await;
         state.auth_tokens.lock().unwrap().remove(&token_key);
     } else {
-        if let Err(e) = store.put_auth_token(LOCAL_USER, &token_key, &code).await {
+        if let Err(e) = store.put_auth_token(COMPAT_USER, &token_key, &code).await {
             return ContentOrRedirect::Content(not_ok_json_response(
                 Status::InternalServerError,
                 make_bad_json_data_response(format!("Could not persist auth token: {}", e)),

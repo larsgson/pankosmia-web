@@ -1,9 +1,17 @@
 # Architecture
 
-`pankosmia_docker` is a Rust HTTP server (Rocket 0.5) that fronts a
-multi-language Bible-translation workflow. Content lives on GitHub;
-the server is the user-facing layer translators interact with
-through their browser.
+`pankosmia_docker` is the online hosted version of the
+[Pankosmia](https://pankosmia.dev/) platform
+([GitHub](https://github.com/pankosmia)). It is a Rust HTTP server
+(Rocket 0.5) that fronts a multi-language Bible-translation
+workflow. Content lives on GitHub; the server is the user-facing
+layer translators interact with through their browser.
+
+The ancestor project
+[pankosmia-web](https://github.com/pankosmia/pankosmia-web) was a
+desktop app using a filesystem backend for a single user. This
+project evolved that API surface into a hosted service with GitHub
+as the sole backend and multi-user authentication.
 
 ## One-paragraph summary
 
@@ -62,7 +70,7 @@ A single GitHub user can fill multiple roles or just one.
 
 `pankosmia-org/catalog` (or whatever org runs the deployment) holds
 one file at the root: `languages.yaml`. Its schema is documented in
-`docs/CATALOG_REPO_TEMPLATE.md` §4.
+`CATALOG_REPO_TEMPLATE.md` §4.
 
 The server clones the catalog at startup, parses
 `languages.yaml`, and materializes a `CatalogRegistry`. Refresh
@@ -176,7 +184,7 @@ Audio bytes never transit the server. The flow:
    browser fetches direct.
 ```
 
-This is the single biggest scaling lever (see `docs/SCALING.md`
+This is the single biggest scaling lever (see `SCALING.md`
 §2). Without it, a 1 Gbps server is bandwidth-limited to ~10
 concurrent audio sessions; with it, concurrency is bounded by
 object-storage quotas, not server bandwidth. Audio metadata
@@ -207,22 +215,20 @@ the same pattern.
 The principle: version control is for content where history is the
 product. Nothing else.
 
-## Two backends, one trait
+## The backend: GitHubLanguageStore
 
-`ProjectStore` is the abstraction the endpoints call. Two
-implementations:
+`ProjectStore` is the trait abstraction the endpoints call.
+The sole implementation is **`GitHubLanguageStore`** — multi-tenant,
+GitHub-backed. User identity via the GitHub App's user-authorization
+flow; writes via the App's installation token.
 
-- **`FsLanguageStore`** — single-tenant, single-user, no auth.
-  For desktop deployments where the binary is bundled inside an
-  app (Electron / Tauri / similar).
-- **`GitHubLanguageStore`** — multi-tenant, GitHub-backed. User
-  identity via the GitHub App's user-authorization flow; writes via
-  the App's installation token. For hosted deployments.
+Endpoint code calls trait methods without knowing the backend
+details. If a new backend were ever needed (e.g., a self-hosted
+Gitea variant), it could be added by writing a second trait impl.
 
-Selected at startup via `STORAGE_BACKEND=fs|github`. Endpoint code
-doesn't bifurcate; the trait method calls are identical regardless
-of backend. New backends (e.g., a self-hosted Gitea variant) can
-be added by writing a third trait impl.
+> **History**: the ancestor project `pankosmia-web` had an
+> `FsLanguageStore` for single-tenant desktop use. That backend was
+> removed; `GitHubLanguageStore` is the sole implementation.
 
 ## Concurrency primitives
 
@@ -283,15 +289,15 @@ be added by writing a third trait impl.
   chapter 2" is not modeled.
 - **Offline-first hosted access.** Hosted users need GitHub
   reachability. Communities in restricted networks (Iran, some
-  corporate / sanctioned environments) use a desktop variant
-  instead — the `FsLanguageStore` backend serves the same
-  endpoint surface against a local working tree.
+  corporate / sanctioned environments) would need the ancestor
+  [pankosmia-web](https://github.com/pankosmia/pankosmia-web)
+  desktop app or a similar offline tool.
 
 ## See also
 
-- `docs/CATALOG_REPO_TEMPLATE.md` — concrete catalog repo setup.
-- `docs/CLIENT_INTEGRATION.md` — building a JS/web client.
-- `docs/DATA_MODEL.md` — entities and where they live.
-- `docs/SECURITY.md` — threat model and defenses.
-- `docs/SCALING.md` — capacity planning.
-- `docs/HOSTING.md` — operator-facing integration contract.
+- `CATALOG_REPO_TEMPLATE.md` — concrete catalog repo setup.
+- `../CLIENT_INTEGRATION.md` — building a JS/web client.
+- `DATA_MODEL.md` — entities and where they live.
+- `SECURITY.md` — threat model and defenses.
+- `SCALING.md` — capacity planning.
+- `../HOSTING.md` — operator-facing integration contract.

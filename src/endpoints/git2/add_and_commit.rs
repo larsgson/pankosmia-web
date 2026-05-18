@@ -34,9 +34,6 @@ pub struct AddCommitForm {
 ///      pool** so a slow commit on a large repo can't fill Tokio's
 ///      default blocking pool and starve the request path.
 ///
-/// In single-tenant FS mode the language lock is taken on
-/// `default_language` (every request resolves there until M5's
-/// `LanguageContext` plugs in real values).
 #[post("/add-and-commit/<repo_path..>", format = "json", data = "<json_form>")]
 pub async fn add_and_commit(
     state: &State<AppSettings>,

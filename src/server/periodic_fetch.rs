@@ -8,8 +8,7 @@
 //! the resulting `git fetch` are picked up by the WatcherRegistry
 //! and broadcast as SSE `change` events to any subscribers.
 //!
-//! Fallback for missed webhook deliveries; harmless in FS mode (the
-//! catalog is empty there, so the loop body is a no-op).
+//! Fallback for missed webhook deliveries.
 //!
 //! Disable by setting `PANKOSMIA_PERIODIC_FETCH_INTERVAL_SECS=0`.
 

@@ -1,4 +1,4 @@
-use crate::identity::LOCAL_USER;
+use crate::identity::COMPAT_USER;
 use crate::static_vars::NET_IS_ENABLED;
 use crate::store::{AuthRequest, SharedProjectStore};
 use crate::structs::{AppSettings, AuthRequest as MirrorAuthRequest, ContentOrRedirect};
@@ -36,7 +36,7 @@ pub async fn gitea_proxy_login(
     }
 
     // Drop any existing token for this endpoint (trait + mirror).
-    let _ = store.delete_auth_token(LOCAL_USER, &token_key).await;
+    let _ = store.delete_auth_token(COMPAT_USER, &token_key).await;
     state.auth_tokens.lock().unwrap().remove(&token_key);
 
     // Record the in-flight auth request.
@@ -48,7 +48,7 @@ pub async fn gitea_proxy_login(
         timestamp: now,
     };
     if let Err(e) = store
-        .put_auth_request(LOCAL_USER, &token_key, req.clone())
+        .put_auth_request(COMPAT_USER, &token_key, req.clone())
         .await
     {
         return ContentOrRedirect::Content(not_ok_json_response(

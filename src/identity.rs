@@ -1,22 +1,16 @@
-//! Strongly-typed identifiers used across the Phase 2 multi-tenant
-//! surface.
+//! Strongly-typed identifiers used across the multi-tenant surface.
 //!
 //! These newtypes intentionally do not carry any storage logic — they
-//! are *just* identifiers. Resolution into filesystem paths or
-//! database rows lives in `crate::store`.
-//!
-//! Backwards compat: in single-tenant FS deployments these resolve to
-//! defaults (the "local" user and the configured default language).
-//! See `docs/PHASE2_DESIGN.md` §11 for the resolved semantics.
+//! are *just* identifiers. Resolution into database rows or GitHub
+//! API calls lives in `crate::store`.
 
 use rocket::request::FromParam;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use uuid::Uuid;
 
-/// Identifier for a user. In hosted Phase 2 deployments this is the
-/// `sub` claim of a Supabase JWT (UUID). In single-tenant FS
-/// deployments this is `UserId(Uuid::nil())`.
+/// Identifier for a user. Derived deterministically from the GitHub
+/// user-id via UUIDv5.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct UserId(pub Uuid);
@@ -45,11 +39,11 @@ impl UserId {
     }
 }
 
-/// The "local user" stand-in used in single-tenant FS deployments
-/// before `AuthUser` (M5) lands. Endpoints reach for this when they
-/// would otherwise have a real `UserId` from a verified JWT. Hosted
-/// Phase 2 deployments never see it — `AuthUser` resolves first.
-pub const LOCAL_USER: UserId = UserId(Uuid::nil());
+/// Placeholder user for legacy compatibility endpoints that predate
+/// per-user auth (settings, navigation). These endpoints are kept
+/// for pankosmia-web compatibility; real per-user state goes through
+/// the `/user-languages/` endpoints with `AuthUser`.
+pub const COMPAT_USER: UserId = UserId(Uuid::nil());
 
 impl fmt::Display for UserId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

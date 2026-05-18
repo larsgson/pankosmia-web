@@ -1,8 +1,8 @@
 //! Authentication request guards.
 //!
 //! Guards are **opt-in per endpoint** — taking them as parameters
-//! activates auth on that route. Endpoints that don't take them
-//! continue to behave as before (single-tenant, no auth required).
+//! activates auth on that route. Read-only endpoints work without
+//! auth since all language content is public.
 
 pub mod auth_user;
 pub mod github_app;

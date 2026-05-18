@@ -1,12 +1,7 @@
 //! `ProjectStore` — the central abstraction over per-language state.
 //!
-//! Two implementations:
-//!   - `FsLanguageStore` for single-tenant FS deployments (M1+).
-//!   - `SupabaseLanguageStore` for hosted multi-tenant deployments
-//!     (M6+).
-//!
-//! Endpoints call only this trait, never `std::fs::*` directly. The
-//! Phase 2 design contract is in `docs/PHASE2_DESIGN.md`.
+//! `GitHubLanguageStore` is the single implementation: multi-tenant,
+//! GitHub-backed. Endpoints call only this trait.
 
 use crate::identity::{LanguageCode, RepoId, UserId};
 use crate::store::types::*;

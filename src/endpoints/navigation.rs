@@ -1,4 +1,4 @@
-use crate::identity::LOCAL_USER;
+use crate::identity::COMPAT_USER;
 use crate::store::SharedProjectStore;
 use crate::structs::{AppSettings, Bcv};
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -20,7 +20,7 @@ pub async fn get_bcv(
     store: &State<SharedProjectStore>,
 ) -> status::Custom<(ContentType, String)> {
     let lang = state.default_language.clone();
-    let bcv = match store.get_bcv(lang, LOCAL_USER).await {
+    let bcv = match store.get_bcv(lang, COMPAT_USER).await {
         Ok(b) => b,
         Err(_) => state.bcv.lock().unwrap().clone(),
     };
@@ -55,7 +55,7 @@ pub async fn post_bcv(
     };
 
     let lang = state.default_language.clone();
-    if let Err(e) = store.put_bcv(lang, LOCAL_USER, bcv.clone()).await {
+    if let Err(e) = store.put_bcv(lang, COMPAT_USER, bcv.clone()).await {
         return not_ok_json_response(
             Status::InternalServerError,
             make_bad_json_data_response(format!("Could not persist bcv: {}", e)),

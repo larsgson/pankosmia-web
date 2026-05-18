@@ -1,4 +1,4 @@
-use crate::identity::LOCAL_USER;
+use crate::identity::COMPAT_USER;
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -15,16 +15,14 @@ use rocket::{get, State};
 ///
 /// `["en"]`
 ///
-/// In Phase 2 (when `AuthUser` lands in M5), the request resolves to
-/// the calling user's languages list. Until then, the single-tenant
-/// stand-in `LOCAL_USER` is used; reads fall back to the AppSettings
-/// mirror when the trait has no record yet.
+/// Legacy compatibility endpoint. Real per-user language management
+/// goes through `/user-languages/`.
 #[get("/languages")]
 pub async fn get_languages(
     state: &State<AppSettings>,
     store: &State<SharedProjectStore>,
 ) -> status::Custom<(ContentType, String)> {
-    let langs: Vec<String> = match store.get_languages(LOCAL_USER).await {
+    let langs: Vec<String> = match store.get_languages(COMPAT_USER).await {
         Ok(ls) if !ls.is_empty() => ls.iter().map(|l| l.to_string()).collect(),
         // NotFound or empty: fall back to AppSettings mirror.
         _ => state.languages.lock().unwrap().clone(),

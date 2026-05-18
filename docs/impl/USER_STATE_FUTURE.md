@@ -16,14 +16,14 @@
 >
 > Until then, the stub endpoints documented below are kept for
 > wire-compatibility with `pankosmia-web` clients. The wrapper's
-> `localStorage` interceptor (see `CLIENT_WRAPPER_GUIDE.md`) routes
+> `localStorage` interceptor (see `../dev/CLIENT_WRAPPER_GUIDE.md`) routes
 > reads and writes locally without server round-trips. See
-> `DECISIONS.md` D3 for the current design choice and trade-offs.
+> `../dev/DECISIONS.md` D3 for the current design choice and trade-offs.
 
 ---
 
 `pankosmia_docker` currently keeps a set of endpoints mounted for
-back-compat with FS-mode `pankosmia-web` clients but treats them as
+back-compat with `pankosmia-web` clients but treats them as
 stubs in GitHub mode (silently drop writes, return defaults on read).
 This doc specifies making them real — persisting per-user state in
 the server's own storage. **Kept as future reference; not part of
@@ -45,7 +45,7 @@ compat but don't persist anything in GitHub mode:
 - `/i18n/used-languages` (GET)
 - `/app-state/current-project` (GET, POST)
 
-The recommendation in `CLIENT_INTEGRATION.md` is "keep this in
+The recommendation in `../CLIENT_INTEGRATION.md` is "keep this in
 `localStorage`." That solves the "the app doesn't crash" problem but
 introduces a worse one:
 
@@ -212,7 +212,7 @@ Two things to preserve carefully so existing clients don't break:
 ### 5.1 Response shapes
 
 Today's stub responses use `{is_good: true, reason: "ok"}` and
-default values that match the old FS-mode behavior. Keep those
+default values for backwards compatibility. Keep those
 shapes exactly. Adding fields is OK; changing types or removing
 fields breaks consumers.
 
@@ -223,7 +223,7 @@ respond with defaults / accept writes (per the stub semantics).
 
 The real implementation should respond `401` for unauthenticated
 requests. **This is a behaviour change.** Document it in
-`CLIENT_INTEGRATION.md`.
+`../CLIENT_INTEGRATION.md`.
 
 For clients that aren't ready to handle 401 from these endpoints,
 two transition options:
@@ -328,7 +328,7 @@ if !langs.contains(&new_lang) {
 | Refactor 6 endpoint families to use the helpers | 1.5 |
 | Soft-mode auth flag (§5.2) | 0.25 |
 | Tests (per endpoint + concurrency + auth) | 1 |
-| Updates to `CLIENT_INTEGRATION.md` (remove "stub" framing; document real behaviour) | 0.5 |
+| Updates to `../CLIENT_INTEGRATION.md` (remove "stub" framing; document real behaviour) | 0.5 |
 | **Total** | **~3.5 days** |
 
 Small. The mechanical work is straightforward — most of the time is in
@@ -397,7 +397,7 @@ synchronization. Acceptable.
 - `BULK_OPS_SPEC.md` — implementation of bulk Git operations.
   Independent.
 - `AUDIO_STRATEGY.md` — external audio storage. Independent.
-- `CLIENT_WRAPPER_GUIDE.md` — describes how clients consume these
+- `../dev/CLIENT_WRAPPER_GUIDE.md` — describes how clients consume these
   endpoints.
 - `ARCHITECTURE_DECISIONS.md` — records why we chose server-side
   state over middleware.

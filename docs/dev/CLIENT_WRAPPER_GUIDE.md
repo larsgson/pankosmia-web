@@ -188,8 +188,9 @@ expect.
 
 The wrapper package exposes an `<OBSWrapper>` that provides these
 contexts plus a no-op replacement for the workspace's
-`RequireResources` (which today calls `/git/list-local-repos`, a
-legacy FS-mode endpoint not present in `pankosmia_docker`).
+`RequireResources` (which calls `/git/list-local-repos`, a legacy
+endpoint from the ancestor `pankosmia-web` not present in this
+project).
 
 ```tsx
 import { PankosmiaProvider } from '@pankosmia/client-wrapper';
@@ -271,10 +272,10 @@ wrapper involvement:
 | Create new ingredient | First `POST /burrito/ingredient/raw/...` creates the file | ✅ |
 | Delete ingredient | `POST /burrito/ingredient/delete/...` | ✅ |
 | Rename/move (copy + delete src) | `POST /burrito/ingredient/copy/...?delete_src=true` | ✅ |
-| Revert (note: GitHub-mode semantics) | `POST /burrito/ingredient/revert/...` | ⚠ See note below |
+| Revert | `POST /burrito/ingredient/revert/...` | ⚠ See note below |
 
-The "revert" semantics differ from FS-mode `.bak` restoration. In
-GitHub mode, revert restores from upstream HEAD. For an audio
+The "revert" semantics differ from the ancestor `pankosmia-web`'s
+`.bak` restoration. Here, revert restores from upstream HEAD. For an audio
 reference file written in this session that's never been merged
 upstream, revert deletes the file (because there's no upstream version
 to revert to). Host PWA UI should communicate this when offering a
@@ -298,15 +299,15 @@ for bulk ops as for single-file saves.
 
 ## 9. Local development
 
-Two backends to point at:
+Point your dev environment at a running `pankosmia_docker` instance:
 
-- **Local FS-mode** (legacy): `VITE_API_BASE=http://127.0.0.1:19119`.
-  No sign-in. Best for fast iteration. Matches the historical
-  `pankosmia-web` desktop experience.
-- **Hosted GitHub-mode**: `VITE_API_BASE=https://your-pankosmia.example`.
-  Requires GitHub App setup per `HOSTING.md`.
+```
+VITE_API_BASE=https://your-pankosmia.example
+```
 
-CORS: the hosted server must allow the dev origin (e.g.,
+Requires GitHub App setup per `HOSTING.md`.
+
+CORS: the server must allow the dev origin (e.g.,
 `http://localhost:5173`). Configure via `pankosmia_docker`'s CORS
 allowlist env var.
 
@@ -415,6 +416,6 @@ deliberate architectural choice (D3) rather than a workaround.
 
 ### `pankosmia_docker`'s existing docs
 
-- `CLIENT_INTEGRATION.md` — server-side contract.
-- `HOSTING.md` — operator setup.
+- `../CLIENT_INTEGRATION.md` — server-side contract.
+- `../HOSTING.md` — operator setup.
 - `SECURITY.md` — auth model.

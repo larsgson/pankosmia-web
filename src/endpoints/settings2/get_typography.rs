@@ -1,4 +1,4 @@
-use crate::identity::LOCAL_USER;
+use crate::identity::COMPAT_USER;
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -17,7 +17,7 @@ pub(crate) async fn get_typography(
     state: &State<AppSettings>,
     store: &State<SharedProjectStore>,
 ) -> status::Custom<(ContentType, String)> {
-    let typography = match store.get_typography(LOCAL_USER).await {
+    let typography = match store.get_typography(COMPAT_USER).await {
         Ok(t) => t,
         // Fall back to the AppSettings mirror until the trait has a
         // record (first POST will populate it).

@@ -1,34 +1,27 @@
 # Hosting
 
-Operator-facing guide. How to deploy, configure, and run
-`pankosmia_docker` in production.
+Operator-facing guide for deploying and running
+`pankosmia_docker` — the online hosted version of the
+[Pankosmia](https://pankosmia.dev/) platform.
 
-For the architecture and design rationale, see
-`docs/ARCHITECTURE.md`. For client-side integration, see
-`docs/CLIENT_INTEGRATION.md`. For capacity planning, see
-`docs/SCALING.md`.
-
----
-
-## 1. Two deployment modes
-
-`pankosmia_docker` ships one binary that supports two backends:
-
-| Mode | When to use | Configuration |
-|---|---|---|
-| **`STORAGE_BACKEND=fs`** (default) | Single-tenant desktop / dev / internal LAN. No auth. | Just point at a workspace dir. |
-| **`STORAGE_BACKEND=github`** | Multi-tenant hosted. GitHub App (identity + writes), GitHub-backed content. | All env vars below. |
-
-The endpoint surface is identical between modes. A client built
-for one runs against the other (modulo authentication).
+For architecture see `dev/ARCHITECTURE.md`, for client integration
+see `CLIENT_INTEGRATION.md`, for capacity planning see
+`dev/SCALING.md`.
 
 ---
 
-## 2. Required environment for the GitHub backend
+## 1. Backend
+
+`pankosmia_docker` uses GitHub as its storage backend. Content
+lives in per-language GitHub repos; edits land as pull requests
+via a GitHub App. Reads are public (no auth required); writes
+require sign-in. All env vars below are required.
+
+---
+
+## 2. Required environment
 
 ```bash
-STORAGE_BACKEND=github                                       # selector
-
 # GitHub App — user identity (OAuth-style flow)
 GITHUB_CLIENT_ID=...                                         # the App's Client ID
 GITHUB_CLIENT_SECRET=...                                     # the App's Client Secret
@@ -174,7 +167,7 @@ The `Secure` cookie flag is set to `true` if any configured origin
 The catalog repo (`pankosmia-org/catalog` by convention; pick any
 name your org owns) is the registry of registered languages.
 
-See `docs/CATALOG_REPO_TEMPLATE.md` for the full setup, including:
+See `dev/CATALOG_REPO_TEMPLATE.md` for the full setup, including:
 
 - Branch protection rules.
 - The `validate-catalog` GitHub Action.
@@ -292,7 +285,6 @@ right.
 ### Required env vars (Railway → Variables)
 
 ```
-STORAGE_BACKEND=github
 PANKOSMIA_PUBLIC_ORIGIN=https://<your-service>.up.railway.app
 PANKOSMIA_ALLOWED_ORIGINS=https://<netlify-app>.netlify.app   # optional; add if proxied from other origins (see §3.3)
 GITHUB_WEBHOOK_SECRET=<long random string; same value used to register repo webhooks>
@@ -399,7 +391,7 @@ deployment. Clients render the same SSE-driven "content updated"
 affordance either way, but the wording differs: with webhooks,
 "someone just updated this passage" reads true; without them,
 "recent update available — refresh?" matches reality. The
-`docs/CLIENT_INTEGRATION.md` §7 "Propagation latency" section
+`CLIENT_INTEGRATION.md` §7 "Propagation latency" section
 gives the client-side guidance.
 
 ---
@@ -444,7 +436,7 @@ CMD ["/app/bin/server", "/data"]
 
 Disk capacity: roughly the sum of all language repos' clone sizes
 plus active user fork clones. Most deployments need ~50–500 GB.
-Rough envelope per `docs/SCALING.md` §5.
+Rough envelope per `dev/SCALING.md` §5.
 
 Backups: snapshot the volume nightly. Loss of the workspace is
 recoverable — content is on GitHub — but loss of the encrypted
@@ -548,7 +540,6 @@ Open issues at
 Include:
 
 - Crate version (`pankosmia_docker --version`).
-- Backend mode (`STORAGE_BACKEND` value).
 - The endpoint and full URL involved.
 - A curl reproduction if possible.
 - Server log output around the failure.

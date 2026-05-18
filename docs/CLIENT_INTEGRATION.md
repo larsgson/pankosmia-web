@@ -1,74 +1,66 @@
 # Client integration
 
 For developers building a JS/web client against `pankosmia_docker`.
-Covers the two backend modes, sign-in, the read/save/watch loop, the
-admin / review panel, error handling, the endpoint surface, and the
-features that are deliberately out of scope for now.
+Covers sign-in, the read/save/watch loop, the admin / review panel,
+error handling, the endpoint surface, and the features that are
+deliberately out of scope for now.
 
-A v0.14.x `pankosmia-web` client works against this server with no
-code changes when the server runs in **FS mode**. When the server
-runs in **GitHub mode** (hosted, multi-tenant), the client needs to
-sign in and to set one extra header on per-language requests — see
-§1 and §4.
+A v0.14.x `pankosmia-web` client works against this server with
+minimal changes: the client needs to sign in for writes and to set
+one extra header on per-language requests — see §1 and §4.
 
 ---
 
 ## 1. Compatibility with pankosmia-web
 
-`pankosmia_docker` is a fork of [pankosmia/pankosmia-web](https://github.com/pankosmia/pankosmia-web)
-with a hosted, GitHub-backed mode added. The single-tenant
-filesystem-backed mode is preserved verbatim, and that's the source
-of compatibility:
+`pankosmia_docker` is the online hosted version of the
+[Pankosmia](https://pankosmia.dev/) platform
+([pankosmia-web](https://github.com/pankosmia/pankosmia-web))
+backed by GitHub repos.
 
 - **All read endpoints** (`/burrito/ingredient/raw/...`, `/version`,
   `/settings/...`, `/navigation/bcv`, `/i18n/...`, etc.) have the
   same URLs, methods, query strings, and JSON shapes as in
-  pankosmia-web.
+  pankosmia-web. Content is public; reads don't require auth.
 - **All save endpoints** keep their URLs and request/response
-  shapes. The server returns the same `{"is_good": true, "reason":
-  "ok"}` envelope on success in FS mode. In GitHub mode the
-  envelope grows additional fields (`pr_number`, `pr_url`, `branch`,
-  `status`); clients that ignore unknown fields keep working.
+  shapes. The success envelope includes additional fields
+  (`pr_number`, `pr_url`, `branch`, `status`); clients that ignore
+  unknown fields keep working.
 - **SSE on the read URL** (`Accept: text/event-stream`) is the same
   shape as before.
 
-What changes when the deployment runs **GitHub mode**:
+What clients need beyond vanilla pankosmia-web:
 
 - The client must sign in (§3) before save / admin requests succeed.
 - Per-language requests must include the `X-Language-Code` header
   (§4). Read endpoints don't require it (the catalog routes by
   `<repo_path>` for legacy reads), but save-style endpoints do.
-- A few endpoints are intentionally not implemented in GitHub mode
-  yet — see §13 for the 501 list.
+- A few endpoints are intentionally not implemented yet — see §13
+  for the 501 list.
 - Per-user app state (BCV cursor, typography) is **not persisted
   server-side**. The endpoints exist for compatibility but return
   defaults / silently accept writes; clients should keep this in
   `localStorage`.
 
-A v0.14.x client running unmodified against a GitHub-mode server
-will be able to view content. For editing, layer the sign-in flow on
-top and add the language header.
+A v0.14.x client running unmodified will be able to view content.
+For editing, layer the sign-in flow on top and add the language
+header.
 
 ---
 
-## 2. The two backend modes
+## 2. Backend overview
 
-| | `STORAGE_BACKEND=fs` | `STORAGE_BACKEND=github` |
-|---|---|---|
-| Source of truth | Local workspace tree | Per-language GitHub repos |
-| Auth | None | GitHub-App user-authorisation (session cookie) |
-| Per-language header | Ignored | Required for saves |
-| Save mechanism | `fs::write` to the working tree | Branch + commit + PR via the App's installation token |
-| Save response | `{is_good: true, reason: "ok"}` | adds `status`, `branch`, `pr_url`, `pr_number` |
-| Multi-file ops | Implemented | 501 (deferred — see §13) |
-| Audio path | Not built | Not built |
-
-Endpoint **URLs are the same** across both modes; the server picks
-the backend at boot.
+| | Value |
+|---|---|
+| Source of truth | Per-language GitHub repos |
+| Auth | GitHub-App user-authorisation (session cookie); reads are public |
+| Per-language header | Required for saves |
+| Save mechanism | Branch + commit + PR via the App's installation token |
+| Save response | `{is_good: true, status, branch, pr_url, pr_number}` |
 
 ---
 
-## 3. Sign in (GitHub mode only)
+## 3. Sign in
 
 The server orchestrates the OAuth-shaped flow. Identity only — the
 GitHub App user-authorisation flow requests **no scopes**.
@@ -126,7 +118,7 @@ for re-use on next sign-in.
 
 ---
 
-## 4. The `X-Language-Code` header (GitHub mode)
+## 4. The `X-Language-Code` header
 
 Every save / admin request must declare which language it targets:
 
@@ -164,9 +156,9 @@ function encodeRepoPath(parts) {
 }
 ```
 
-In GitHub mode, reads serve from the server's local clone of the
-upstream repo — no GitHub API call on the read path. The clone is
-refreshed by the language webhook (§7).
+Reads serve from the server's local clone of the upstream repo — no
+GitHub API call on the read path. The clone is refreshed by the
+language webhook (§7).
 
 ---
 
@@ -189,14 +181,9 @@ async function save(repoPath, ipath, newText) {
 ```
 
 Request body shape: `{ "payload": "<the new text>" }` — same as
-pankosmia-web's FS endpoint.
+pankosmia-web.
 
-**FS-mode success:**
-```json
-{ "is_good": true, "reason": "ok" }
-```
-
-**GitHub-mode success:**
+**Success response:**
 ```json
 {
   "is_good": true,
@@ -227,36 +214,32 @@ async function saveBytes(repoPath, ipath, blob) {
 }
 ```
 
-**GitHub-mode cap:** 700 KB raw bytes (the GitHub Contents API
-limits the request to ~1 MB base64-encoded; we leave headroom).
-Larger uploads return 413; see §10.
+**Size cap:** 700 KB raw bytes (the GitHub Contents API limits the
+request to ~1 MB base64-encoded; we leave headroom). Larger uploads
+return 413; see §10.
 
 ### 6.3 Delete — `POST /burrito/ingredient/delete/<repo_path>?ipath=...`
 
-- **FS mode**: soft delete — renames the file to `<file>.bak`.
-- **GitHub mode**: hard delete from the working branch (the file is
-  removed on the PR's diff; reviewer can `Revert and merge` if they
-  change their mind).
+Hard delete from the working branch. The file is removed on the
+PR's diff; the reviewer can revert if they change their mind.
 
 ### 6.4 Revert — `POST /burrito/ingredient/revert/<repo_path>?ipath=...`
 
-- **FS mode**: restores `<file>.bak` over `<file>`.
-- **GitHub mode**: replaces the working-branch version with
-  upstream HEAD's version of the file (or deletes the file from the
-  branch if it doesn't exist upstream).
+Replaces the working-branch version with upstream HEAD's version of
+the file (or deletes the file from the branch if it doesn't exist
+upstream).
 
 ### 6.5 Copy — `POST /burrito/ingredient/copy/<repo_path>?src_path=...&target_path=...&delete_src=true|false`
 
-Same URL/params as pankosmia-web. In GitHub mode this becomes two
-Contents-API calls (read source from the working branch, write to
-target; optionally delete source).
+Same URL/params as pankosmia-web. This becomes two Contents-API
+calls (read source from the working branch, write to target;
+optionally delete source).
 
 ### 6.6 What about update_ingredients / no_bak?
 
-These query params on `/burrito/ingredient/raw/...` are honoured in
-FS mode (same behaviour as pankosmia-web). In GitHub mode they are
-silently ignored — there's no `.bak` concept in the App flow, and
-metadata regeneration runs in a separate (deferred) endpoint.
+These query params on `/burrito/ingredient/raw/...` are silently
+ignored — there's no `.bak` concept, and metadata regeneration runs
+in a separate endpoint (`/burrito/metadata/remake-ingredients/`).
 
 ---
 
@@ -287,7 +270,7 @@ es.addEventListener('error', () => { /* EventSource auto-reconnects */ });
 es.close();
 ```
 
-What triggers a `change` event in **GitHub mode**:
+What triggers a `change` event:
 
 | Trigger | What happens |
 |---|---|
@@ -341,7 +324,7 @@ Audio bytes never live on `pankosmia_docker`. Instead, clients store
 small JSON reference files inside the burrito that point at audio
 hosted externally — primarily on Internet Archive, secondarily on any
 other CC-licensed host. The full strategy is in
-`docs/impl/AUDIO_STRATEGY.md`; the integration surface for clients is
+`impl/AUDIO_STRATEGY.md`; the integration surface for clients is
 just the standard ingredient save endpoint.
 
 ### Reference file shape (v1)
@@ -415,7 +398,7 @@ By default the server accepts these SPDX-style license values:
 `CC-BY-NC-SA-4.0`, `CC-BY-NC-ND-4.0`, `Public-Domain`.
 
 Operators can override via `PANKOSMIA_ALLOWED_LICENSES` (see
-`docs/HOSTING.md` §2). Setting it to `*` disables validation.
+`HOSTING.md` §2). Setting it to `*` disables validation.
 
 ### Playback
 
@@ -436,7 +419,7 @@ A few save-style endpoints write many files in one atomic commit
 instead of one file per call. Under the hood they use GitHub's Git
 Data API (blob create → tree compose → commit → ref update) so the
 PR sees a single commit even when the operation touches dozens of
-files. See `docs/impl/BULK_OPS.md` for the design.
+files. See `impl/BULK_OPS.md` for the design.
 
 ### Limits
 
@@ -505,11 +488,9 @@ await authedFetch(
 ```
 
 **Checksum-format note.** The per-ingredient `checksum` field is
-`{ "sha1": "<git-blob-sha1>" }` in GitHub mode — taken directly
-from GitHub's tree response. This is a documented behaviour delta
-from FS mode (which uses `{"md5": "..."}`); the trade-off avoids
-per-blob downloads that an md5 strategy would require. Clients
-inspecting the checksum should accept either shape.
+`{ "sha1": "<git-blob-sha1>" }` — taken directly from GitHub's
+tree response. Clients inspecting the checksum should accept this
+shape.
 
 ### `POST /burrito/zipped/<repo>`
 
@@ -652,7 +633,7 @@ repo visibility, so the user never needs direct GitHub access.
 - `GET /version` — same shape as pankosmia-web (`pkg_version`,
   `product_*`, `product_resources`).
 - `GET /health` — readiness probe. `200 {"status":"ok",...}` when
-  the catalog is loaded AND the App is configured (in GitHub mode);
+  the catalog is loaded and the App is configured;
   `503 {"status":"degraded", "reasons":[...]}` otherwise. Use for
   reverse-proxy traffic-shifting; do not use as a user-facing
   readiness signal.
@@ -670,9 +651,9 @@ repo visibility, so the user never needs direct GitHub access.
 | 401 | Not signed in / session expired / token revoked | Show the sign-in button |
 | 403 | Signed in but lacks permission (admin endpoints) | Hide the panel; surface a message |
 | 404 | Language not in catalog, or ingredient not found | Show an empty state |
-| 413 | Payload too large (GitHub-mode 700 KB cap on raw/bytes saves) | Surface the limit to the user |
+| 413 | Payload too large (700 KB cap on raw/bytes saves) | Surface the limit to the user |
 | 429 | Per-user save rate limit exceeded (60 saves / 15 min) | Backoff per the `reason` text's `retry in <N>s` hint |
-| 501 | Endpoint not yet implemented in GitHub mode (multi-file ops) | Disable the affected UI |
+| 501 | Endpoint not yet implemented (multi-file ops) | Disable the affected UI |
 | 5xx / 502 | Server or GitHub-upstream error | Retry with backoff, surface to user |
 
 ### 10.2 Envelope
@@ -692,27 +673,16 @@ we may change reason strings as bugs are fixed.)
 
 ## 11. Local development
 
-### 11.1 Against an FS-mode dev server
-
-```bash
-VITE_API_BASE=http://127.0.0.1:19119 npm run dev
-```
-
-No sign-in needed. Save/read/watch all work without auth. Best for
-fast iteration; matches the pankosmia-web dev experience.
-
-### 11.2 Against a GitHub-mode dev server
-
 ```bash
 VITE_API_BASE=https://dev.example.com npm run dev
 ```
 
-You'll need a GitHub App (see `docs/HOSTING.md` §3) configured with
+You'll need a GitHub App (see `HOSTING.md` §3) configured with
 the dev origin's callback URL (`/auth/callback`). One shared App
 across multiple developers is fine; the App's user-to-server flow
 doesn't grant the dev anything beyond their own identity.
 
-### 11.3 CORS in dev
+### CORS in dev
 
 The hosted dev server must allow your dev origin (e.g.
 `http://localhost:5173`). Add to the CORS allowlist on the server
@@ -743,8 +713,8 @@ components must close it in their `useEffect` cleanup; otherwise the
 server accumulates orphaned streams.
 
 **P6: Persisting BCV / typography in pankosmia-docker storage.**
-In GitHub mode those endpoints are stubs that return defaults. Keep
-per-user UI state in `localStorage`.
+Those endpoints are stubs that return defaults. Keep per-user UI
+state in `localStorage`.
 
 **P7: Showing GitHub-side terms in the translator UI.** "PR",
 "branch", "fork" — keep these out. The translator only needs
@@ -758,7 +728,7 @@ server-internal identity, not display copy.
 
 ## 13. Endpoint quick reference
 
-Read / watch (no auth needed in FS mode; session in GitHub mode):
+Read / watch (no auth needed — content is public):
 
 | Endpoint | Method | Notes |
 |---|---|---|
@@ -771,13 +741,13 @@ Read / watch (no auth needed in FS mode; session in GitHub mode):
 | `/burrito/metadata/summaries` | GET | All summaries |
 | `/burrito/paths/<repo>` | GET | File listing |
 
-Write — single file (session required + `X-Language-Code` in GitHub mode):
+Write — single file (session required + `X-Language-Code`):
 
 | Endpoint | Method | Notes |
 |---|---|---|
 | `/burrito/ingredient/raw/<repo>?ipath=...` | POST | JSON body `{payload: "..."}`. Also used for audio reference writes — paths matching `audio_content/**/ref.json` are schema-validated server-side (see §7b). |
 | `/burrito/ingredient/bytes/<repo>?ipath=...` | POST | multipart `file` field |
-| `/burrito/ingredient/delete/<repo>?ipath=...` | POST | Delete (FS soft / GitHub hard) |
+| `/burrito/ingredient/delete/<repo>?ipath=...` | POST | Hard delete from working branch |
 | `/burrito/ingredient/revert/<repo>?ipath=...` | POST | Restore previous content |
 | `/burrito/ingredient/copy/<repo>?src_path=&target_path=&delete_src=` | POST | Copy / move |
 
@@ -788,9 +758,9 @@ Write — bulk (atomic multi-file commit; same auth + caps in §7c):
 | `/burrito/ingredients/delete/<repo>?ipath=<prefix>` | POST | Atomic recursive delete under `ingredients/<prefix>` |
 | `/burrito/ingredient/zipped/<repo>?ipath=<prefix>` | POST | Zip import under `ingredients/<prefix>` (multipart `file`) |
 | `/burrito/zipped/<repo>` | POST | Replace entire burrito from zip (multipart `file`) |
-| `/burrito/metadata/remake-ingredients/<repo>` | POST | Regenerate `metadata.json` from current tree (checksum uses git blob sha1 in GitHub mode) |
+| `/burrito/metadata/remake-ingredients/<repo>` | POST | Regenerate `metadata.json` from current tree (checksum uses git blob sha1) |
 
-Auth (GitHub mode only):
+Auth:
 
 | Endpoint | Method | Notes |
 |---|---|---|
@@ -817,9 +787,8 @@ System:
 | `/webhook/catalog` | POST | HMAC-signed; called by GitHub |
 | `/webhook/language/<code>` | POST | HMAC-signed; called by GitHub |
 
-State endpoints kept for pankosmia-web compatibility (FS-backed
-behaviour preserved; GitHub-mode returns defaults / accepts
-silently):
+State endpoints kept for pankosmia-web compatibility (return
+defaults / accept silently):
 
 | Endpoint | Method | Notes |
 |---|---|---|
@@ -831,7 +800,7 @@ silently):
 
 ---
 
-## 14. Not yet implemented (in GitHub mode)
+## 14. Not yet implemented
 
 Not yet wired at all:
 
@@ -842,7 +811,7 @@ Not yet wired at all:
   the underlying GitHub PUT.
 - **`/me/pending-prs`** (translator-facing list of one's own open
   edits). Coming alongside the trusted-contributors mitigation
-  documented in `docs/SECURITY.md` §4.
+  documented in `dev/SECURITY.md` §4.
 
 When these land, the URLs above will be the ones to call.
 
@@ -850,7 +819,7 @@ When these land, the URLs above will be the ones to call.
 
 ## See also
 
-- `docs/ARCHITECTURE.md` — design rationale and trust topology.
-- `docs/CATALOG_REPO_TEMPLATE.md` — setting up the language catalog.
-- `docs/SECURITY.md` — auth, ACLs, and abuse-mitigation details.
-- `docs/HOSTING.md` — operator setup for the GitHub-App backend.
+- `dev/ARCHITECTURE.md` — design rationale and trust topology.
+- `dev/CATALOG_REPO_TEMPLATE.md` — setting up the language catalog.
+- `dev/SECURITY.md` — auth, ACLs, and abuse-mitigation details.
+- `HOSTING.md` — operator setup for the GitHub-App backend.

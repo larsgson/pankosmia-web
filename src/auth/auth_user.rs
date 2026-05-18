@@ -1,16 +1,12 @@
 //! `AuthUser` request guard — session-cookie based.
 //!
-//! Replaces the v0.15.x JWT-based auth with a session cookie that
-//! identifies the user by their GitHub user-id. The OAuth token
-//! itself is never sent to the browser — the server looks it up
-//! via `TokenStore` whenever it needs to call GitHub.
+//! Identifies the user by their GitHub user-id from a signed session
+//! cookie. The OAuth token itself is never sent to the browser — the
+//! server looks it up via `TokenStore` whenever it needs to call GitHub.
 //!
 //! Forward semantics: when there is no session cookie, this guard
-//! `Outcome::Forward`s. Optional-auth routes (e.g. `/version`) work
-//! without sign-in. Routes that take `LanguageContext` get a
-//! synthesized `LOCAL_USER` if no real session exists, preserving
-//! single-tenant FS-mode behavior. Hosted deployments add a fairing
-//! that requires a real session for protected routes.
+//! `Outcome::Forward`s so that read-only endpoints (public content)
+//! work without sign-in. Write endpoints check auth explicitly.
 
 use crate::auth::session::read_session;
 use crate::identity::UserId;

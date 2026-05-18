@@ -1,14 +1,9 @@
-//! Runtime backend selector for `ProjectStore`.
+//! Builds the `GitHubLanguageStore` at startup.
 //!
-//! `STORAGE_BACKEND=fs` (default) → `FsLanguageStore` over a local
-//! workspace directory.
-//!
-//! `STORAGE_BACKEND=github` → `GitHubLanguageStore`. Reads from a
-//! `CatalogRegistry`, clones language repos lazily, writes via the
-//! GitHub App's installation token (see `docs/AUTH_MODEL.md`).
+//! Reads from a `CatalogRegistry`, clones language repos lazily,
+//! writes via the GitHub App's installation token.
 
 use crate::catalog::CatalogRegistry;
-use crate::store::fs::FsLanguageStore;
 use crate::store::github::GitHubLanguageStore;
 use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::SharedProjectStore;
@@ -23,31 +18,16 @@ pub struct StoreBundle {
 
 pub fn build_project_store(
     workspace_root: PathBuf,
-    catalog: Option<Arc<CatalogRegistry>>,
+    catalog: Arc<CatalogRegistry>,
 ) -> StoreBundle {
-    match env::var("STORAGE_BACKEND")
-        .unwrap_or_else(|_| "fs".into())
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "fs" => StoreBundle {
-            store: Arc::new(FsLanguageStore::new(workspace_root)),
-            sqlite: None,
-        },
-        "github" => {
-            let registry =
-                catalog.expect("STORAGE_BACKEND=github requires a CatalogRegistry; pass Some(...)");
-            let mut store = GitHubLanguageStore::new(workspace_root, registry);
-            let sqlite = open_sqlite_if_configured().map(Arc::new);
-            if let Some(ref db) = sqlite {
-                store = store.with_sqlite(Arc::clone(db));
-            }
-            StoreBundle {
-                store: Arc::new(store),
-                sqlite,
-            }
-        }
-        other => panic!("unknown STORAGE_BACKEND={}", other),
+    let mut store = GitHubLanguageStore::new(workspace_root, catalog);
+    let sqlite = open_sqlite_if_configured().map(Arc::new);
+    if let Some(ref db) = sqlite {
+        store = store.with_sqlite(Arc::clone(db));
+    }
+    StoreBundle {
+        store: Arc::new(store),
+        sqlite,
     }
 }
 

@@ -121,8 +121,8 @@ Audio is the largest content type in the burrito ecosystem. Where
 should audio bytes be stored?
 
 - **A. Inside the burrito** (as plain audio files, e.g.,
-  `audio_content/01-01_T.wav`) — the FS-mode pattern from
-  `pankosmia-web`.
+  `audio_content/01-01_T.wav`) — the pattern from the ancestor
+  project `pankosmia-web`.
 - **B. Inside `pankosmia_docker`'s storage**, separate from the
   burrito (e.g., volume-mounted audio cache) — the presign-URL
   pattern originally planned in `CLIENT_INTEGRATION.md §14`.
@@ -219,8 +219,8 @@ adding storage features to the server.
 
 `pankosmia_docker` exposes endpoints for per-user UI state
 (`/navigation/bcv/*`, `/settings/*`, `/app-state/*`) inherited from
-the FS-mode `pankosmia-web` ancestor. In FS-mode they wrote to disk.
-In GitHub mode they're stubs — they accept writes silently and
+the ancestor project `pankosmia-web`. In that project they wrote
+to disk. Here they're stubs — they accept writes silently and
 return defaults on reads. Where should this state actually live?
 
 Three candidates:
@@ -344,9 +344,9 @@ message.
 
 ### Question
 
-In FS mode, saves were direct fs writes — immediate, no review. In
-GitHub mode, saves go through a per-user working branch and open a
-PR.
+In the ancestor `pankosmia-web`, saves were direct filesystem
+writes — immediate, no review. In this project, saves go through a
+per-user working branch and open a PR.
 
 Should this PR flow be hidden from translators (treat it as a save +
 async sync), or surfaced (translators see "your edit is in PR #N
@@ -493,11 +493,11 @@ becomes idiomatic?
 
 **Status**: schema supports both. Convention emerges from PWA usage.
 
-### O6. Migration tooling for existing FS-mode audio data
+### O6. Migration tooling for existing audio data
 
-If existing burritos contain audio bytes (from FS-mode deployments),
-a migration CLI could upload them to IA and replace the byte files
-with reference JSONs.
+If existing burritos contain audio bytes (from older `pankosmia-web`
+deployments), a migration CLI could upload them to IA and replace
+the byte files with reference JSONs.
 
 **Status**: out of scope for v1. Documented in `AUDIO_STRATEGY.md §11`
 as a future tool.
@@ -552,11 +552,11 @@ The current spec set:
 
 ### `pankosmia_docker`'s existing docs
 
-- `CLIENT_INTEGRATION.md` — minor updates when AUDIO and BULK_OPS
+- `../CLIENT_INTEGRATION.md` — minor updates when AUDIO and BULK_OPS
   ship (remove their entries from the 501 list, add their sections).
   The BCV-localStorage pitfall (P6) **stays** — it's accurate under
   D3.
-- `HOSTING.md` — adds audio env vars when AUDIO ships.
+- `../HOSTING.md` — adds audio env vars when AUDIO ships.
 - `SECURITY.md` — unchanged.
 - `CATALOG_REPO_TEMPLATE.md` — unchanged.
 - `ARCHITECTURE.md` — unchanged in the immediate term; refer to

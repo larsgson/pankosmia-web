@@ -261,7 +261,7 @@ Pankosmia hosted deployment. It contains exactly one file:
 
 1. Create a public GitHub repo for your language. The repo must
    contain a `metadata.json` at the root and an `ingredients/`
-   directory at minimum. (See `docs/DATA_MODEL.md` for the full
+   directory at minimum. (See `DATA_MODEL.md` for the full
    structure.)
 2. Open a pull request to this repo adding an entry to
    `languages.yaml`. Use the registration PR template.
@@ -367,6 +367,6 @@ and resubmit.
 
 See also:
 
-- `docs/ARCHITECTURE.md` — the architecture this catalog plugs into.
-- `docs/CLIENT_INTEGRATION.md` — what the client UI does on top
+- `ARCHITECTURE.md` — the architecture this catalog plugs into.
+- `../CLIENT_INTEGRATION.md` — what the client UI does on top
   of all this.

@@ -31,7 +31,7 @@
 
 use crate::catalog::CatalogRegistry;
 use crate::identity::{LanguageCode, RepoId, UserId};
-use crate::store::fs::paths;
+use crate::store::paths;
 use crate::store::project_store::{ProjectStore, Tx};
 use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::types::*;

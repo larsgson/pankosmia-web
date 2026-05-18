@@ -26,7 +26,7 @@ use crate::utils::response::{not_ok_json_response, ok_json_response};
 use rocket::http::{ContentType, CookieJar, Status};
 use rocket::response::status;
 use rocket::State;
-use std::env;
+
 use std::sync::Arc;
 
 /// Maximum raw bytes per ingredient PUT/upload via the App flow.
@@ -35,11 +35,7 @@ use std::sync::Arc;
 /// + commit message.
 pub const MAX_INGREDIENT_BYTES: usize = 700_000;
 
-pub fn is_github_backend() -> bool {
-    env::var("STORAGE_BACKEND")
-        .map(|v| v.eq_ignore_ascii_case("github"))
-        .unwrap_or(false)
-}
+
 
 /// Endpoint contract: validate one or more ingredient-path strings
 /// before dispatching. Returns `Ok(())` if all are well-formed,

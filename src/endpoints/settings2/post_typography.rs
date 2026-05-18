@@ -1,4 +1,4 @@
-use crate::identity::LOCAL_USER;
+use crate::identity::COMPAT_USER;
 use crate::store::SharedProjectStore;
 use crate::structs::{AppSettings, Typography};
 use crate::utils::client::Clients;
@@ -44,7 +44,7 @@ pub async fn post_typography(
 
     // Trait write — authoritative.
     if let Err(e) = store
-        .put_typography(LOCAL_USER, new_typography.clone())
+        .put_typography(COMPAT_USER, new_typography.clone())
         .await
     {
         return not_ok_json_response(
