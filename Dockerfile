@@ -30,6 +30,7 @@ RUN apt-get update \
        cmake \
        zlib1g-dev \
        ca-certificates \
+       perl \
     && rm -rf /var/lib/apt/lists/*
 
 # Cook dependencies (cached until Cargo.toml/Cargo.lock change).
