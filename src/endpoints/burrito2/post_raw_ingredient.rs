@@ -4,6 +4,7 @@ use crate::endpoints::burrito2::github_save::{
 };
 use crate::server::{LanguageLocks, RateLimiter};
 use crate::store::github::{AudioRefConfig, GithubEditFlow, SaveOp};
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::structs::{AppSettings, BurritoMetadata};
 use crate::utils::burrito::{
     destination_parent, ingredients_metadata_from_files, ingredients_scopes_from_files,
@@ -19,6 +20,7 @@ use rocket::serde::json::Json;
 use rocket::{post, State};
 use serde_json::Value;
 use std::path::{Components, PathBuf};
+use std::sync::Arc;
 
 /// *`POST /ingredient/raw/<repo_path>?ipath=my_burrito_path&update_ingredients&no_bak`*
 ///
@@ -50,6 +52,7 @@ pub async fn post_raw_ingredient(
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
     audio_ref_cfg: &State<AudioRefConfig>,
+    sqlite: &State<Option<Arc<SqliteUserState>>>,
     language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
     ipath: String,
@@ -81,6 +84,7 @@ pub async fn post_raw_ingredient(
             locks,
             rate_limiter,
             audio_ref_cfg,
+            sqlite,
             language_header,
             SaveOp::Put {
                 ipath: &ipath,

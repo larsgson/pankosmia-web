@@ -14,5 +14,6 @@ pub mod navigation;
 pub mod settings2;
 pub mod sse;
 pub mod temp_file;
+pub mod user_languages;
 pub mod version;
 pub mod video;

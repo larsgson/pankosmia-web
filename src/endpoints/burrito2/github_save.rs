@@ -11,6 +11,7 @@
 use crate::auth::session::read_session;
 use crate::auth::{GithubAppAuth, GithubClient, LanguageHeader, TokenStore};
 use crate::catalog::CatalogRegistry;
+use crate::identity::UserId;
 use crate::server::{LanguageLocks, RateLimitError, RateLimiter};
 use crate::store::github::audio_ref::{
     head_validate_url, is_audio_ref_path, validate_schema, AudioRefConfig,
@@ -18,6 +19,7 @@ use crate::store::github::audio_ref::{
 use crate::store::github::{
     apply_bulk_op, BulkOp, BulkOpError, BulkOutcome, GithubEditFlow, SaveOp, SaveOutcome,
 };
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::utils::json_responses::make_bad_json_data_response;
 use crate::utils::paths::check_path_string_components;
 use crate::utils::response::{not_ok_json_response, ok_json_response};
@@ -56,6 +58,44 @@ pub fn validate_ipath_segments(
     Ok(())
 }
 
+use crate::identity::LanguageCode;
+
+fn resolve_language(
+    language_header: &Option<LanguageHeader>,
+    sqlite: &Option<Arc<SqliteUserState>>,
+    github_user_id: i64,
+) -> Result<LanguageCode, status::Custom<(ContentType, String)>> {
+    if let Some(LanguageHeader(l)) = language_header {
+        return Ok(l.clone());
+    }
+    if let Some(db) = sqlite.as_ref() {
+        let user_id = UserId::from_github_id(github_user_id);
+        match db.get_current_language(&user_id) {
+            Ok(Some(l)) => return Ok(l),
+            Ok(None) => {
+                return Err(not_ok_json_response(
+                    Status::BadRequest,
+                    make_bad_json_data_response(
+                        "no active language; set one via POST /user-languages/current-language/<code>".into(),
+                    ),
+                ));
+            }
+            Err(e) => {
+                return Err(not_ok_json_response(
+                    Status::InternalServerError,
+                    make_bad_json_data_response(format!("db: {}", e)),
+                ));
+            }
+        }
+    }
+    Err(not_ok_json_response(
+        Status::BadRequest,
+        make_bad_json_data_response(
+            "X-Language-Code header required (no user state database configured)".into(),
+        ),
+    ))
+}
+
 /// Run a `SaveOp` against the GitHub edit flow. Encapsulates the
 /// session-cookie → rate-limit → size-check → token → login →
 /// apply_op pipeline used by every single-file save endpoint.
@@ -69,6 +109,7 @@ pub async fn handle_github_op<'a>(
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
     audio_ref_cfg: &State<AudioRefConfig>,
+    sqlite: &State<Option<Arc<SqliteUserState>>>,
     language_header: Option<LanguageHeader>,
     op: SaveOp<'a>,
     commit_message: &str,
@@ -150,16 +191,9 @@ pub async fn handle_github_op<'a>(
             }
         }
     }
-    let lang = match language_header {
-        Some(LanguageHeader(l)) => l,
-        None => {
-            return not_ok_json_response(
-                Status::BadRequest,
-                make_bad_json_data_response(
-                    "X-Language-Code header required for GitHub backend".into(),
-                ),
-            );
-        }
+    let lang = match resolve_language(&language_header, sqlite.inner(), github_user_id) {
+        Ok(l) => l,
+        Err(resp) => return resp,
     };
     let app_auth = match app_auth.inner().as_ref() {
         Some(a) => a,
@@ -296,6 +330,7 @@ pub async fn handle_github_bulk(
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
+    sqlite: &State<Option<Arc<SqliteUserState>>>,
     language_header: Option<LanguageHeader>,
     op: BulkOp,
     commit_message: &str,
@@ -315,16 +350,9 @@ pub async fn handle_github_bulk(
             make_bad_json_data_response(format!("rate limit exceeded; retry in {}s", retry_after)),
         );
     }
-    let lang = match language_header {
-        Some(LanguageHeader(l)) => l,
-        None => {
-            return not_ok_json_response(
-                Status::BadRequest,
-                make_bad_json_data_response(
-                    "X-Language-Code header required for GitHub backend".into(),
-                ),
-            );
-        }
+    let lang = match resolve_language(&language_header, sqlite.inner(), github_user_id) {
+        Ok(l) => l,
+        Err(resp) => return resp,
     };
     let app_auth = match app_auth.inner().as_ref() {
         Some(a) => a,

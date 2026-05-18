@@ -5,6 +5,7 @@ use crate::endpoints::burrito2::github_save::{
 };
 use crate::server::{LanguageLocks, RateLimiter};
 use crate::store::github::BulkOp;
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -37,6 +38,7 @@ pub async fn post_delete_ingredients(
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
+    sqlite: &State<Option<Arc<SqliteUserState>>>,
     language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
     ipath: String,
@@ -62,6 +64,7 @@ pub async fn post_delete_ingredients(
             github_client,
             locks,
             rate_limiter,
+            sqlite,
             language_header,
             BulkOp::DeleteByPrefix { prefix },
             &commit_message,

@@ -87,6 +87,14 @@ pub(crate) fn add_routes(rocket_instance: Rocket<Build>) -> Rocket<Build> {
             endpoints::app_state::post_current_project,
             endpoints::app_state::post_empty_current_project,
         ])
+        .mount("/user-languages", routes![
+            endpoints::user_languages::get_available_languages,
+            endpoints::user_languages::get_my_languages,
+            endpoints::user_languages::claim_language,
+            endpoints::user_languages::release_language,
+            endpoints::user_languages::get_current_language,
+            endpoints::user_languages::post_current_language,
+        ])
         .mount("/gitea", routes![
             endpoints::gitea2::gitea_remote_repos::gitea_remote_repos,
             endpoints::gitea2::gitea_user_remote_repos::gitea_user_remote_repos,

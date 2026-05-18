@@ -4,6 +4,7 @@ use crate::endpoints::burrito2::github_save::{
 };
 use crate::server::{LanguageLocks, RateLimiter};
 use crate::store::github::{AudioRefConfig, GithubEditFlow, SaveOp};
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::burrito::destination_parent;
@@ -16,6 +17,7 @@ use rocket::http::{ContentType, CookieJar, Status};
 use rocket::response::status;
 use rocket::{post, State};
 use std::path::{Components, PathBuf};
+use std::sync::Arc;
 
 /// *`POST /ingredient/copy/<repo_path>?src_path=<src_path>&target_path=<target_path>&delete_src`*
 ///
@@ -35,6 +37,7 @@ pub async fn copy_ingredient(
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
     audio_ref_cfg: &State<AudioRefConfig>,
+    sqlite: &State<Option<Arc<SqliteUserState>>>,
     language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
     src_path: String,
@@ -61,6 +64,7 @@ pub async fn copy_ingredient(
             locks,
             rate_limiter,
             audio_ref_cfg,
+            sqlite,
             language_header,
             SaveOp::Copy {
                 src_ipath: &src_path,

@@ -16,24 +16,36 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+pub struct StoreBundle {
+    pub store: SharedProjectStore,
+    pub sqlite: Option<Arc<SqliteUserState>>,
+}
+
 pub fn build_project_store(
     workspace_root: PathBuf,
     catalog: Option<Arc<CatalogRegistry>>,
-) -> SharedProjectStore {
+) -> StoreBundle {
     match env::var("STORAGE_BACKEND")
         .unwrap_or_else(|_| "fs".into())
         .to_ascii_lowercase()
         .as_str()
     {
-        "fs" => Arc::new(FsLanguageStore::new(workspace_root)),
+        "fs" => StoreBundle {
+            store: Arc::new(FsLanguageStore::new(workspace_root)),
+            sqlite: None,
+        },
         "github" => {
             let registry =
                 catalog.expect("STORAGE_BACKEND=github requires a CatalogRegistry; pass Some(...)");
             let mut store = GitHubLanguageStore::new(workspace_root, registry);
-            if let Some(db) = open_sqlite_if_configured() {
-                store = store.with_sqlite(Arc::new(db));
+            let sqlite = open_sqlite_if_configured().map(Arc::new);
+            if let Some(ref db) = sqlite {
+                store = store.with_sqlite(Arc::clone(db));
             }
-            Arc::new(store)
+            StoreBundle {
+                store: Arc::new(store),
+                sqlite,
+            }
         }
         other => panic!("unknown STORAGE_BACKEND={}", other),
     }

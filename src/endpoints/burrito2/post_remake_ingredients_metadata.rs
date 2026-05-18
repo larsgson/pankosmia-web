@@ -3,6 +3,7 @@ use crate::catalog::CatalogRegistry;
 use crate::endpoints::burrito2::github_save::{handle_github_bulk, is_github_backend};
 use crate::server::{LanguageLocks, RateLimiter};
 use crate::store::github::BulkOp;
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::SharedProjectStore;
 use crate::structs::{AppSettings, BurritoMetadata};
 use crate::utils::burrito::{ingredients_metadata_from_files, ingredients_scopes_from_files};
@@ -36,6 +37,7 @@ pub async fn remake_ingredients_metadata(
     github_client: &State<GithubClient>,
     locks: &State<LanguageLocks>,
     rate_limiter: &State<RateLimiter>,
+    sqlite: &State<Option<Arc<SqliteUserState>>>,
     language_header: Option<LanguageHeader>,
     repo_path: PathBuf,
 ) -> status::Custom<(ContentType, String)> {
@@ -48,6 +50,7 @@ pub async fn remake_ingredients_metadata(
             github_client,
             locks,
             rate_limiter,
+            sqlite,
             language_header,
             BulkOp::RegenerateMetadata {
                 app_resources_dir: state.app_resources_dir.clone(),

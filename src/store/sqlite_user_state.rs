@@ -178,6 +178,56 @@ impl SqliteUserState {
         self.put_user(&UserId::nil(), &key, &json)
     }
 
+    // -- user language claims -------------------------------------------
+
+    pub fn get_claimed_languages(&self, user: &UserId) -> StoreResult<Vec<LanguageCode>> {
+        match self.get_user(user, "claimed_languages")? {
+            Some(json) => {
+                let codes: Vec<String> =
+                    serde_json::from_str(&json).map_err(|e| StoreError::Json(e))?;
+                codes
+                    .into_iter()
+                    .map(|s| {
+                        LanguageCode::parse(&s)
+                            .map_err(|e| StoreError::Invalid(format!("bad language code: {}", e)))
+                    })
+                    .collect()
+            }
+            None => Ok(Vec::new()),
+        }
+    }
+
+    pub fn put_claimed_languages(&self, user: &UserId, langs: &[LanguageCode]) -> StoreResult<()> {
+        let codes: Vec<&str> = langs.iter().map(|l| l.as_str()).collect();
+        let json = serde_json::to_string(&codes)?;
+        self.put_user(user, "claimed_languages", &json)
+    }
+
+    pub fn get_current_language(&self, user: &UserId) -> StoreResult<Option<LanguageCode>> {
+        match self.get_user(user, "current_language")? {
+            Some(s) => Ok(Some(LanguageCode::parse(&s).map_err(|e| {
+                StoreError::Invalid(format!("bad language code: {}", e))
+            })?)),
+            None => Ok(None),
+        }
+    }
+
+    pub fn put_current_language(&self, user: &UserId, lang: &LanguageCode) -> StoreResult<()> {
+        self.put_user(user, "current_language", lang.as_str())
+    }
+
+    pub fn clear_current_language(&self, user: &UserId) -> StoreResult<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM user_state WHERE user_id = ?1 AND key = ?2",
+            rusqlite::params![user.0.to_string(), "current_language"],
+        )
+        .map_err(map_err)?;
+        Ok(())
+    }
+
+    // -- auth tokens -----------------------------------------------------
+
     pub fn get_auth_token(&self, user: &UserId, key: &str) -> StoreResult<Option<String>> {
         let db_key = format!("auth_token:{}", key);
         self.get_user(user, &db_key)
