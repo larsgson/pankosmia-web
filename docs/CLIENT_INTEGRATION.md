@@ -6,8 +6,8 @@ error handling, the endpoint surface, and the features that are
 deliberately out of scope for now.
 
 A v0.14.x `pankosmia-web` client works against this server with
-minimal changes: the client needs to sign in for writes and to set
-one extra header on per-language requests — see §1 and §4.
+minimal changes: the client needs to sign in for writes and to
+select a working language on the dashboard — see §1 and §4.
 
 ---
 
@@ -32,9 +32,17 @@ backed by GitHub repos.
 What clients need beyond vanilla pankosmia-web:
 
 - The client must sign in (§3) before save / admin requests succeed.
-- Per-language requests must include the `X-Language-Code` header
-  (§4). Read endpoints don't require it (the catalog routes by
-  `<repo_path>` for legacy reads), but save-style endpoints do.
+- The server must know which language the user is working on. Two
+  options (see §4):
+  - **Dashboard selection** — the user selects a language via the
+    dashboard (`POST /user-languages/current-language/<code>`).
+    All save endpoints then resolve the language from that
+    server-side state. No per-request header needed. This is the
+    backwards-compatible path for existing pankosmia-web clients.
+  - **`X-Language-Code` header** — set the header on each request.
+    Overrides the dashboard selection when present. Useful for
+    future clients that work with multiple languages without
+    switching on the dashboard.
 - A few endpoints are intentionally not implemented yet — see §13
   for the 501 list.
 - Per-user app state (BCV cursor, typography) is persisted
@@ -42,8 +50,8 @@ What clients need beyond vanilla pankosmia-web:
   Clients can also keep a `localStorage` mirror as a fallback.
 
 A v0.14.x client running unmodified will be able to view content.
-For editing, layer the sign-in flow on top and add the language
-header.
+For editing, layer the sign-in flow on top and select a working
+language on the dashboard.
 
 ---
 
@@ -53,7 +61,7 @@ header.
 |---|---|
 | Source of truth | Per-language GitHub repos |
 | Auth | GitHub-App user-authorisation (session cookie); reads are public |
-| Per-language header | Required for saves |
+| Language resolution | Dashboard selection or `X-Language-Code` header (§4) |
 | Save mechanism | Branch + commit + PR via the App's installation token |
 | Save response | `{is_good: true, status, branch, pr_url, pr_number}` |
 
@@ -117,9 +125,47 @@ for re-use on next sign-in.
 
 ---
 
-## 4. The `X-Language-Code` header
+## 4. Language resolution for save endpoints
 
-Every save / admin request must declare which language it targets:
+Every save endpoint needs to know which language the user is working
+on. The server resolves this in order:
+
+1. **`X-Language-Code` header** — if the request includes this
+   header, its value is used. Takes precedence over the dashboard.
+2. **Dashboard selection** — if no header is present, the server
+   reads the user's `current_language` from SQLite (set via
+   `POST /user-languages/current-language/<code>`).
+3. **Neither** — the server returns 400 with
+   `"no active language; set one via POST /user-languages/current-language/<code>"`.
+
+Read endpoints don't need either — they route by `<repo_path>` in
+the URL.
+
+### Option A: dashboard selection (recommended for current clients)
+
+The user selects their working language once on the dashboard. All
+subsequent save requests resolve the language from server-side
+state — no per-request header needed. This is fully backwards
+compatible with existing pankosmia-web clients.
+
+```js
+// One-time: user picks a language on the dashboard
+await fetch(`${API_BASE}/user-languages/current-language/fr`, {
+  method: 'POST', credentials: 'include'
+});
+
+// All saves now work without any language header
+async function authedFetch(url, options = {}) {
+  return fetch(url, { ...options, credentials: 'include' });
+}
+```
+
+### Option B: per-request header (for multi-language clients)
+
+Clients that work with multiple languages in a single session —
+or that want to avoid depending on server-side state — can set the
+`X-Language-Code` header on each request. When present, it overrides
+the dashboard selection.
 
 ```js
 async function authedFetch(url, options = {}) {
@@ -130,11 +176,10 @@ async function authedFetch(url, options = {}) {
 }
 ```
 
-The session cookie carries identity; `X-Language-Code` (BCP 47
-subset; e.g. `en`, `fr-CA`, `zh-Hans`) carries the working language.
-
-Reads keep using the legacy `<repo_path>` URL segments and do not
-require the header.
+`X-Language-Code` is a BCP 47 subset (e.g. `en`, `fr-CA`,
+`zh-Hans`). Both options can coexist — a client that normally uses
+the dashboard selection can still send the header on specific
+requests to override it.
 
 ---
 
@@ -741,7 +786,7 @@ Read / watch (no auth needed — content is public):
 | `/burrito/metadata/summaries` | GET | All summaries |
 | `/burrito/paths/<repo>` | GET | File listing |
 
-Write — single file (session required + `X-Language-Code`):
+Write — single file (session required; language via dashboard or header, §4):
 
 | Endpoint | Method | Notes |
 |---|---|---|

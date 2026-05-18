@@ -286,8 +286,7 @@ Gitea variant), it could be added by writing a second trait impl.
   unit of access control. "User X can edit chapter 1 but not
   chapter 2" is not modeled.
 - **Offline-first hosted access.** Hosted users need GitHub
-  reachability. Communities in restricted networks (Iran, some
-  corporate / sanctioned environments) would need the ancestor
+  reachability. Communities in restricted networks (some restricted countries / corporate / sanctioned environments) would need the ancestor
   [pankosmia-web](https://github.com/pankosmia/pankosmia-web)
   desktop app or a similar offline tool.
 

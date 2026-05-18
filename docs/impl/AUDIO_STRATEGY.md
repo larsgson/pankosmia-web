@@ -210,7 +210,7 @@ when present. Path is the fallback for legacy clients.
                   │
                   │ 4. POST /burrito/ingredient/raw/<repo>?ipath=audio_content/01-01/ref.json
                   │    body: {"payload": "<the JSON above>"}
-                  │    + cookie + X-Language-Code
+                  │    + cookie (+ optional X-Language-Code)
                   ▼
 ┌─────────────────────────────────────────────┐
 │ pankosmia_docker                             │

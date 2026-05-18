@@ -163,8 +163,9 @@ silent escalation isn't possible.
 `LanguageContext` request guard:
 
 1. User from `AuthUser` (session cookie).
-2. Language from `X-Language-Code` header (or default for
-   single-language users).
+2. Language from `X-Language-Code` header, or from the user's
+   dashboard selection (`current_language` in SQLite) when no
+   header is present.
 3. Role from `ProjectStore::project_role(user, language)`. The
    GitHub backend implementation calls
    `GET /repos/{repo}/collaborators/{user}/permission` and maps

@@ -167,7 +167,7 @@ delete sequence to clean up empty directories.
 **Request**:
 - URL: `/burrito/ingredients/delete/<source>/<org>/<repo>?ipath=<prefix>`
 - Method: `POST`
-- Auth: session cookie + `X-Language-Code` header (same as single-file).
+- Auth: session cookie; language via dashboard selection or `X-Language-Code` header (same as single-file — see `CLIENT_INTEGRATION.md` §4).
 - Body: none.
 
 **Behaviour**:
@@ -216,7 +216,7 @@ added/removed via the GitHub web UI directly.
 **Request**:
 - URL: `/burrito/metadata/remake-ingredients/<source>/<org>/<repo>`
 - Method: `POST`
-- Auth: session cookie + `X-Language-Code` header.
+- Auth: session cookie; language via dashboard or header.
 - Body: none.
 
 **Behaviour**:
@@ -275,7 +275,7 @@ imports (less common), and similar bulk-ingest flows.
 - Method: `POST`
 - Content-Type: `multipart/form-data`
 - Form field: `file` (the zip).
-- Auth: session cookie + `X-Language-Code` header.
+- Auth: session cookie; language via dashboard or header.
 
 **Behaviour**:
 1. Receive the multipart upload, hold the zip in memory.
@@ -326,7 +326,7 @@ exchange" workflows. **Lowest priority of the four.**
 - Content-Type: `multipart/form-data`
 - Form field: `file` (the zip — expected to contain a full burrito:
   `metadata.json` at root, `ingredients/` directory, audit/, etc.).
-- Auth: session cookie + `X-Language-Code` header.
+- Auth: session cookie; language via dashboard or header.
 
 **Behaviour**:
 1. Receive + validate zip (same checks as §3.3 plus presence of
