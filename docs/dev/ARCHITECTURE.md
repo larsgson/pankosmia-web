@@ -226,9 +226,7 @@ Endpoint code calls trait methods without knowing the backend
 details. If a new backend were ever needed (e.g., a self-hosted
 Gitea variant), it could be added by writing a second trait impl.
 
-> **History**: the ancestor project `pankosmia-web` had an
-> `FsLanguageStore` for single-tenant desktop use. That backend was
-> removed; `GitHubLanguageStore` is the sole implementation.
+`GitHubLanguageStore` is the sole implementation.
 
 ## Concurrency primitives
 

@@ -37,10 +37,9 @@ What clients need beyond vanilla pankosmia-web:
   `<repo_path>` for legacy reads), but save-style endpoints do.
 - A few endpoints are intentionally not implemented yet — see §13
   for the 501 list.
-- Per-user app state (BCV cursor, typography) is **not persisted
-  server-side**. The endpoints exist for compatibility but return
-  defaults / silently accept writes; clients should keep this in
-  `localStorage`.
+- Per-user app state (BCV cursor, typography) is persisted
+  server-side in SQLite when `PANKOSMIA_SQLITE_PATH` is configured.
+  Clients can also keep a `localStorage` mirror as a fallback.
 
 A v0.14.x client running unmodified will be able to view content.
 For editing, layer the sign-in flow on top and add the language
@@ -712,9 +711,10 @@ on reads; the default is fine.
 components must close it in their `useEffect` cleanup; otherwise the
 server accumulates orphaned streams.
 
-**P6: Persisting BCV / typography in pankosmia-docker storage.**
-Those endpoints are stubs that return defaults. Keep per-user UI
-state in `localStorage`.
+**P6: BCV / typography persistence.** The `/navigation/bcv` and
+`/settings/typography` endpoints persist to SQLite when configured
+(`PANKOSMIA_SQLITE_PATH`). Clients can rely on server-side state
+or keep a `localStorage` mirror as a fallback.
 
 **P7: Showing GitHub-side terms in the translator UI.** "PR",
 "branch", "fork" — keep these out. The translator only needs

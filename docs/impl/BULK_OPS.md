@@ -13,11 +13,7 @@ same set:
 
 - `AUDIO_STRATEGY.md` — audio is external (Internet Archive),
   references only land in burritos.
-- `USER_STATE_SPEC.md` — replace the stub `/settings/*`,
-  `/navigation/*`, `/app-state/*` endpoints with real per-user
-  persistence.
-
-All three land independently and unblock different client features.
+Both land independently and unblock different client features.
 None depend on the others.
 
 ---
@@ -47,7 +43,7 @@ a middleware layer) is explicitly NOT the right answer:
 
 The right place is server-side via GitHub's Git Data API, which lets a
 multi-file commit land as one atomic ref update. See
-`ARCHITECTURE_DECISIONS.md` for the broader reasoning on why
+`../dev/DECISIONS.md` for the broader reasoning on why
 operational concerns belong in `pankosmia_docker` rather than in a
 middleware layer.
 
@@ -489,8 +485,7 @@ is fine in practice; can encode 100-file deletions comfortably).
 
 ## 6. What clients (and wrappers) expect
 
-Existing client integration patterns (see `../dev/CLIENT_WRAPPER_GUIDE.md`)
-expect these endpoints to:
+Existing client integration patterns expect these endpoints to:
 
 - Return the same `{is_good, status, branch, pr_url, pr_number, ...}`
   envelope as single-file saves. The wrapper's `save-success` event
@@ -521,13 +516,8 @@ biggest historical use case that pushed against them.
 
 - `AUDIO_STRATEGY.md` — audio is external; reference-only writes are
   single-file saves and don't need bulk ops.
-- `USER_STATE_SPEC.md` — replaces stub state endpoints; orthogonal
-  to bulk ops.
-- `../dev/CLIENT_WRAPPER_GUIDE.md` — what clients expect; this doc's
-  response envelope matches.
-- `ARCHITECTURE_DECISIONS.md` — records why we chose to implement
-  these here rather than in a middleware layer or via client-side
-  polyfill.
+- `../dev/DECISIONS.md` — records why we chose to implement
+  these here rather than in a middleware layer.
 
 ### `pankosmia_docker`'s existing docs
 

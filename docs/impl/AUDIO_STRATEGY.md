@@ -526,8 +526,4 @@ or a periodic mirror job.
 
 - `BULK_OPS_SPEC.md` — Git Data API multi-file commits (parallel
   effort; audio is unrelated).
-- `USER_STATE_SPEC.md` — replaces stub endpoints with real per-user
-  state (parallel effort).
-- `../dev/CLIENT_WRAPPER_GUIDE.md` — how PWA wrappers integrate (consumes
-  this audio spec).
-- `ARCHITECTURE_DECISIONS.md` — records why audio is external.
+- `../dev/DECISIONS.md` — records why audio is external (D2).

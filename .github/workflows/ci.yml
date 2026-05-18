@@ -47,8 +47,6 @@ jobs:
       - name: cargo test --lib
         run: cargo test --locked --lib
 
-      - name: cargo test (FS-backend integration)
-        run: cargo test --locked --test sse_ingredient --test fs_language_store
 
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
