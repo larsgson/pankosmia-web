@@ -23,12 +23,13 @@ FROM rust:1.90-slim-bookworm AS build
 RUN cargo install cargo-chef --locked
 WORKDIR /build
 
-# perl + perl-modules needed by openssl-src's Configure script
+# make + perl + perl-modules needed by openssl-src's build
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        pkg-config \
        libssl-dev \
        cmake \
+       make \
        zlib1g-dev \
        ca-certificates \
        perl \
@@ -37,7 +38,7 @@ RUN apt-get update \
 
 # Cook dependencies (cached until Cargo.toml/Cargo.lock change).
 COPY --from=planner /build/recipe.json recipe.json
-ENV CHEF_CACHE_BUST=1
+ENV CHEF_CACHE_BUST=2
 RUN cargo chef cook --release --recipe-path recipe.json
 
 # Build only the application code (fast — deps already compiled).
