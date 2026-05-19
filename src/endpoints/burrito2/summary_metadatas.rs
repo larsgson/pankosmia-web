@@ -1,14 +1,17 @@
+use crate::auth::session::read_session;
 use crate::gitea::{CuratedOrgs, GiteaCache, GiteaProxyClient};
+use crate::identity::UserId;
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::structs::MetadataSummary;
 use crate::utils::burrito::{summary_metadata_from_file, summary_metadata_from_str};
 use crate::utils::paths::os_slash_str;
 use crate::utils::response::ok_json_response;
-use rocket::http::ContentType;
+use rocket::http::{ContentType, CookieJar};
 use rocket::response::status;
 use rocket::{get, State};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 fn fallback_summary() -> MetadataSummary {
@@ -34,6 +37,8 @@ pub async fn summary_metadatas(
     curated: &State<CuratedOrgs>,
     client: &State<GiteaProxyClient>,
     cache: &State<GiteaCache>,
+    db: &State<Option<Arc<SqliteUserState>>>,
+    cookies: &CookieJar<'_>,
     org: Option<String>,
 ) -> status::Custom<(ContentType, String)> {
     let mut repos: BTreeMap<String, MetadataSummary> = BTreeMap::new();
@@ -182,6 +187,19 @@ pub async fn summary_metadatas(
                     let summary = summary_metadata_from_file(metadata_path)
                         .unwrap_or_else(|_| fallback_summary());
                     repos.insert(repo_url_string, summary);
+                }
+            }
+        }
+    }
+
+    // If the user is logged in and has selected resources, filter to only those.
+    if let Some(uid) = read_session(cookies) {
+        if let Some(db) = db.inner().as_ref() {
+            let user_id = UserId::from_github_id(uid);
+            if let Ok(selected) = db.get_selected_resources(&user_id) {
+                if !selected.is_empty() {
+                    let selected_set: HashSet<&str> = selected.iter().map(|s| s.as_str()).collect();
+                    repos.retain(|k, _| selected_set.contains(k.as_str()));
                 }
             }
         }

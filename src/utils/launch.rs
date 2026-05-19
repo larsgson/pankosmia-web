@@ -95,6 +95,11 @@ pub(crate) fn add_routes(rocket_instance: Rocket<Build>) -> Rocket<Build> {
             endpoints::user_languages::get_current_language,
             endpoints::user_languages::post_current_language,
         ])
+        .mount("/user-resources", routes![
+            endpoints::user_resources::get_my_resources,
+            endpoints::user_resources::select_resource,
+            endpoints::user_resources::deselect_resource,
+        ])
         .mount("/gitea", routes![
             endpoints::gitea2::gitea_remote_repos::gitea_remote_repos,
             endpoints::gitea2::gitea_user_remote_repos::gitea_user_remote_repos,

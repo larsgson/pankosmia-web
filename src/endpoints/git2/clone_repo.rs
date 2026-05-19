@@ -1,6 +1,9 @@
+use crate::auth::session::read_session;
 use crate::gitea::{resolve_read_source, CuratedOrgs, ReadSource};
+use crate::identity::UserId;
 use crate::server::{git_dispatch, BlockingPools, LanguageLocks};
 use crate::static_vars::NET_IS_ENABLED;
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::SharedProjectStore;
 use crate::structs::AppSettings;
 use crate::utils::json_responses::make_bad_json_data_response;
@@ -10,11 +13,12 @@ use crate::utils::response::{
     ok_ok_json_response,
 };
 use git2::{build::RepoBuilder, AutotagOption, FetchOptions, Repository};
-use rocket::http::{ContentType, Status};
+use rocket::http::{ContentType, CookieJar, Status};
 use rocket::response::status;
 use rocket::{post, State};
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 /// POST /clone-repo/<repo_path>?<branch>
 #[post("/clone-repo/<repo_path..>?<branch>")]
@@ -24,6 +28,8 @@ pub async fn clone_repo(
     curated: &State<CuratedOrgs>,
     locks: &State<LanguageLocks>,
     pools: &State<BlockingPools>,
+    db: &State<Option<Arc<SqliteUserState>>>,
+    cookies: &CookieJar<'_>,
     repo_path: PathBuf,
     branch: Option<String>,
 ) -> status::Custom<(ContentType, String)> {
@@ -31,6 +37,18 @@ pub async fn clone_repo(
         resolve_read_source(curated, &repo_path),
         ReadSource::Gitea(_)
     ) {
+        if let Some(uid) = read_session(cookies) {
+            if let Some(db) = db.inner().as_ref() {
+                let user_id = UserId::from_github_id(uid);
+                let path_str = repo_path.to_string_lossy().to_string();
+                if let Ok(mut selected) = db.get_selected_resources(&user_id) {
+                    if !selected.iter().any(|s| s == &path_str) {
+                        selected.push(path_str);
+                        let _ = db.put_selected_resources(&user_id, &selected);
+                    }
+                }
+            }
+        }
         return ok_ok_json_response();
     }
     if !NET_IS_ENABLED.load(Ordering::Relaxed) {

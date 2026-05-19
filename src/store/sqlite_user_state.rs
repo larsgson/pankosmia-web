@@ -226,6 +226,24 @@ impl SqliteUserState {
         Ok(())
     }
 
+    // -- selected resources -----------------------------------------------
+
+    pub fn get_selected_resources(&self, user: &UserId) -> StoreResult<Vec<String>> {
+        match self.get_user(user, "selected_resources")? {
+            Some(json) => {
+                let paths: Vec<String> =
+                    serde_json::from_str(&json).map_err(|e| StoreError::Json(e))?;
+                Ok(paths)
+            }
+            None => Ok(Vec::new()),
+        }
+    }
+
+    pub fn put_selected_resources(&self, user: &UserId, paths: &[String]) -> StoreResult<()> {
+        let json = serde_json::to_string(paths)?;
+        self.put_user(user, "selected_resources", &json)
+    }
+
     // -- auth tokens -----------------------------------------------------
 
     pub fn get_auth_token(&self, user: &UserId, key: &str) -> StoreResult<Option<String>> {
