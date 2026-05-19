@@ -1,16 +1,22 @@
+use crate::auth::session::read_session;
 use crate::gitea::{CuratedOrgs, GiteaProxyClient};
+use crate::identity::UserId;
+use crate::store::sqlite_user_state::SqliteUserState;
 use crate::store::SharedProjectStore;
 use crate::utils::response::ok_json_response;
-use rocket::http::ContentType;
+use rocket::http::{ContentType, CookieJar};
 use rocket::response::status;
 use rocket::{get, State};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
+use std::sync::Arc;
 
 #[get("/list-local-repos")]
 pub async fn list_local_repos(
     store: &State<SharedProjectStore>,
     curated: &State<CuratedOrgs>,
     client: &State<GiteaProxyClient>,
+    db: &State<Option<Arc<SqliteUserState>>>,
+    cookies: &CookieJar<'_>,
 ) -> status::Custom<(ContentType, String)> {
     let mut repos: BTreeSet<String> = BTreeSet::new();
 
