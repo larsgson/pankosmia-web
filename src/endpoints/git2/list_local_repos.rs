@@ -105,10 +105,8 @@ pub async fn list_local_repos(
         if let Some(db) = db.inner().as_ref() {
             let user_id = UserId::from_github_id(uid);
             if let Ok(selected) = db.get_selected_resources(&user_id) {
-                if !selected.is_empty() {
-                    let selected_set: HashSet<&str> = selected.iter().map(|s| s.as_str()).collect();
-                    repos_vec.retain(|k| selected_set.contains(k.as_str()));
-                }
+                let selected_set: HashSet<&str> = selected.iter().map(|s| s.as_str()).collect();
+                repos_vec.retain(|k| selected_set.contains(k.as_str()));
             }
         }
     }

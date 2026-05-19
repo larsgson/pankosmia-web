@@ -192,15 +192,13 @@ pub async fn summary_metadatas(
         }
     }
 
-    // If the user is logged in and has selected resources, filter to only those.
+    // If the user is logged in, filter to only their selected resources.
     if let Some(uid) = read_session(cookies) {
         if let Some(db) = db.inner().as_ref() {
             let user_id = UserId::from_github_id(uid);
             if let Ok(selected) = db.get_selected_resources(&user_id) {
-                if !selected.is_empty() {
-                    let selected_set: HashSet<&str> = selected.iter().map(|s| s.as_str()).collect();
-                    repos.retain(|k, _| selected_set.contains(k.as_str()));
-                }
+                let selected_set: HashSet<&str> = selected.iter().map(|s| s.as_str()).collect();
+                repos.retain(|k, _| selected_set.contains(k.as_str()));
             }
         }
     }
