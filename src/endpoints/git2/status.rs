@@ -1,3 +1,4 @@
+use crate::gitea::{resolve_read_source, CuratedOrgs, ReadSource};
 use crate::server::{git_dispatch, BlockingPools, LanguageLocks};
 use crate::store::SharedProjectStore;
 use crate::structs::{AppSettings, GitStatusRecord};
@@ -20,10 +21,17 @@ use std::path::PathBuf;
 pub async fn git_status(
     state: &State<AppSettings>,
     store: &State<SharedProjectStore>,
+    curated: &State<CuratedOrgs>,
     locks: &State<LanguageLocks>,
     pools: &State<BlockingPools>,
     repo_path: PathBuf,
 ) -> status::Custom<(ContentType, String)> {
+    if matches!(
+        resolve_read_source(curated, &repo_path),
+        ReadSource::Gitea(_)
+    ) {
+        return ok_json_response("[]".to_string());
+    }
     let repo_path_string: String = store.workspace_root().to_string_lossy().into_owned()
         + os_slash_str()
         + &repo_path.display().to_string();
